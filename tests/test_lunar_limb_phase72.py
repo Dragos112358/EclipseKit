@@ -177,7 +177,9 @@ def test_angular_profile_sorts_nonperiodic_data_and_rejects_non_finite_request()
 
 
 def test_neural_corrector_uses_lazy_torch_import_and_adapter_provenance():
-    import torch
+    torch = pytest.importorskip(
+        "torch", reason="Neural adapter test requires the optional limb extra"
+    )
 
     class FakeModel:
         def __call__(self, u, v):

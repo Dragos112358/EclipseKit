@@ -299,7 +299,9 @@ def test_original_lunar_limb_corrector_remains_accepted_directly():
 
 def test_neural_corrector_loads_safe_checkpoint_and_predicts(tmp_path, monkeypatch):
     """Exercise the locally-defined PyTorch architecture without real weights."""
-    import torch
+    torch = pytest.importorskip(
+        "torch", reason="Neural checkpoint tests require the optional limb extra"
+    )
 
     checkpoint_path = tmp_path / "synthetic-checkpoint.pt"
     checkpoint_path.write_bytes(b"test fixture; torch.load is replaced below")
@@ -344,7 +346,9 @@ def test_neural_corrector_rejects_missing_checkpoint_before_loading(tmp_path):
 
 
 def test_neural_corrector_wraps_unsafe_checkpoint_load_error(tmp_path, monkeypatch):
-    import torch
+    torch = pytest.importorskip(
+        "torch", reason="Neural checkpoint tests require the optional limb extra"
+    )
 
     path = tmp_path / "untrusted.pt"
     path.write_bytes(b"not a real checkpoint")
