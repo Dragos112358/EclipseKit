@@ -17,6 +17,7 @@ from eclipsekit.certification import (
     source_tree_fingerprint,
     write_certification_report,
 )
+from eclipsekit import __version__
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -268,7 +269,7 @@ def test_phase15_audit_creates_report_and_does_not_claim_certification(tmp_path:
         run_software=False,
     )
     assert report["status"] == "NOT_CERTIFIED"
-    assert report["package_version"] == "0.1.0"
+    assert report["package_version"] == __version__
     assert report["target_release_version"] == "1.0.0"
     assert any(item["name"] == "reference_matrix_and_fingerprints" and item["status"] == "PASS" for item in report["gates"])
     assert any(item["name"] == "independent_lunar_dem_control_points" and item["status"] == "NOT_RUN" for item in report["gates"])
