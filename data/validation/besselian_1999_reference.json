@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "case_id": "besselian-1999-08-11-nasa-gsfc",
+  "name": "1999-08-11 total eclipse — NASA published Besselian elements",
+  "elements_file": "besselian_1999_aug11_nasa.json",
+  "delta_t_seconds": 63.7,
+  "expected_maximum_offset_seconds": 249.1,
+  "maximum_offset_tolerance_seconds": 0.5,
+  "central_line_position_tolerance_km": 0.5,
+  "central_line_reference_samples": [
+    {
+      "offset_seconds": 180.0,
+      "latitude_deg": 45.09,
+      "longitude_deg": 24.256666666666668
+    },
+    {
+      "offset_seconds": 240.0,
+      "latitude_deg": 44.935,
+      "longitude_deg": 24.725
+    }
+  ],
+  "expected_eclipse_type": "total",
+  "local_observer": {
+    "name": "Romania — near central line benchmark point",
+    "latitude_deg": 45.075,
+    "longitude_deg": 24.30,
+    "elevation_m": 0.0
+  },
+  "expected_central_phase_duration_seconds": 142.9,
+  "central_phase_duration_tolerance_seconds": 3.0,
+  "source_url": "https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm1951/SE1999Aug11Tbeselm.html",
+  "path_table_source_url": "https://eclipse.gsfc.nasa.gov/SEpath/SEpath1951/SE1999Aug11Tpath.html",
+  "source_notes": "NASA GSFC publishes the 11:00:00 TDT Besselian epoch, greatest eclipse at 11:04:09.1 TDT, Delta-T=63.7 s, and the polynomial coefficients. The central-line check interpolates the NASA path-table rows at 11:03 UT and 11:04 UT to the UT1 instant corresponding to the computed TT maximum. The local observer is a regression point close to the central line, not a survey-grade station. The duration tolerance accounts for this offset and rounded table values."
+}

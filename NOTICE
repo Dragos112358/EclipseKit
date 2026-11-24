@@ -1,0 +1,18 @@
+eclipsekit
+Copyright 2026 Dragos-Eduard-Gabriel Boncan
+
+This product includes software developed by Dragos-Eduard-Gabriel Boncan.
+It was extracted and refactored from the author's earlier project,
+Eclipse Simulator 3D.
+
+The nine small files allow-listed under data/validation contain reference
+values transcribed from public NASA/GSFC eclipse publications and other
+identified public references. Each record or manifest retains its source URL.
+These files are provided for regression and validation use, not as a complete
+or authoritative ephemeris, DEM, or eclipse catalogue.
+
+The local city catalogue, lunar DEM products, ephemeris kernels, neural model
+checkpoints, and any other third-party data are not included in the public
+package. Their licences, attribution requirements, and redistribution terms
+remain separate from the Apache-2.0 licence applying to EclipseKit software.
+See docs/DATA_PROVENANCE.md.

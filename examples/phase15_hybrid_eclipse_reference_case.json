@@ -1,0 +1,10 @@
+{
+  "case_id": "solar-2023-04-20-hybrid-global-maximum",
+  "name": "2023-04-20 — hybrid solar eclipse, geocentric greatest eclipse",
+  "event_time_utc": "2023-04-20T04:16:44.8Z",
+  "expected_maximum_utc": "2023-04-20T04:16:44.8Z",
+  "tolerance_seconds": 30,
+  "expected_eclipse_type": "hybrid",
+  "source_url": "https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2023Apr20Hbeselm.html",
+  "source_notes": "NASA GSFC identifies this as a hybrid solar eclipse and publishes the instant of greatest eclipse as 04:16:44.8 UT. This regression checks the geocentric greatest-eclipse epoch only; the expected_eclipse_type field records the source's event classification and is not a computed classification at every location. NASA's published Besselian realization uses VSOP87/ELP2000-85 and Delta-T=70.3 s; EclipseKit's configured DE440s realization may differ slightly, so the 30-second tolerance is a screening threshold, not a universal accuracy claim."
+}

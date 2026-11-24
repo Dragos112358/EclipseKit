@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "path_cases": [
+    {
+      "case_id": "global-path-2017-08-21-nasa",
+      "name": "2017-08-21 total eclipse — NASA central line",
+      "event_time_utc": "2017-08-21T18:26:00Z",
+      "reference_file": "global_path_2017-08-21.csv",
+      "search_radius_hours": 4.0,
+      "tolerance_km": 5.0,
+      "source_url": "https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html",
+      "source_time_step_seconds": 120,
+      "source_coordinate_resolution_arcmin": 0.1,
+      "source_notes": "Seven sparse check points sampled from the NASA GSFC WGS 84 central-line table, whose published rows are spaced at 120-second intervals. The table clock is Universal Time and is preserved as time_ut1. The 5 km screening tolerance includes the difference between the reference prediction realization and this project's ephemeris/time-scale configuration; it is not an accuracy claim."
+    },
+    {
+      "case_id": "global-path-2019-07-02-nasa",
+      "name": "2019-07-02 total eclipse — NASA central line",
+      "event_time_utc": "2019-07-02T19:23:00Z",
+      "reference_file": "global_path_2019-07-02.csv",
+      "search_radius_hours": 4.0,
+      "tolerance_km": 5.0,
+      "source_url": "https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2019Jul02Tpath.html",
+      "source_time_step_seconds": 120,
+      "source_coordinate_resolution_arcmin": 0.1,
+      "source_notes": "Seven sparse check points sampled from the NASA GSFC WGS 84 central-line table. The source labels its clock Universal Time; the CSV preserves this as time_ut1. This comparison screens central-axis coordinates only, not path boundaries or local contact times."
+    },
+    {
+      "case_id": "global-path-2020-06-21-nasa",
+      "name": "2020-06-21 annular eclipse — NASA central line",
+      "event_time_utc": "2020-06-21T06:40:00Z",
+      "reference_file": "global_path_2020-06-21.csv",
+      "search_radius_hours": 4.0,
+      "tolerance_km": 5.0,
+      "source_url": "https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2020Jun21Apath.html",
+      "source_time_step_seconds": 120,
+      "source_coordinate_resolution_arcmin": 0.1,
+      "source_notes": "Seven sparse check points sampled from the NASA GSFC WGS 84 antumbral central-line table. The source labels its clock Universal Time; the CSV preserves this as time_ut1. This comparison screens central-axis coordinates only."
+    },
+    {
+      "case_id": "global-path-2026-08-12-nasa",
+      "name": "2026-08-12 total eclipse — NASA central line",
+      "event_time_utc": "2026-08-12T17:46:00Z",
+      "reference_file": "global_path_2026-08-12.csv",
+      "search_radius_hours": 4.0,
+      "tolerance_km": 15.0,
+      "source_url": "https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2026Aug12Tpath.html",
+      "source_time_step_seconds": 120,
+      "source_coordinate_resolution_arcmin": 0.1,
+      "source_notes": "Seven sparse check points sampled from the NASA GSFC WGS 84 central-line table. NASA states this prediction uses VSOP87/ELP2000-85 and Delta-T=71.4 seconds. The default operational EOP run uses the configured Skyfield time-scale source rather than forcing that historical Delta-T; previous comparisons show several-kilometre realization differences. The 15 km limit is a broad regression screen, not a precision claim. A separate fixed-Delta-T run can reproduce the published realization more closely."
+    }
+  ]
+}

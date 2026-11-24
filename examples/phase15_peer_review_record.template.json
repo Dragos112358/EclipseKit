@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "reviewer": "REPLACE_WITH_INDEPENDENT_REVIEWER_NAME",
+  "reviewer_affiliation": "REPLACE_WITH_AFFILIATION",
+  "reviewer_is_independent": false,
+  "review_date_utc": "YYYY-MM-DDTHH:MM:SSZ",
+  "review_outcome": "pending",
+  "source_tree_sha256": "REPLACE_WITH_SOURCE_TREE_SHA256_FROM_PHASE15_REPORT",
+  "scope": [
+    "solar eclipse prediction and local circumstances",
+    "global shadow path and corridor geometry",
+    "lunar DEM handling and control-point validation",
+    "public API and release packaging"
+  ],
+  "findings": [
+    {
+      "id": "REVIEW-001",
+      "description": "Record each material review finding and its disposition.",
+      "status": "open"
+    }
+  ]
+}

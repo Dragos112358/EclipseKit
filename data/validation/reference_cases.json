@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "local_cases": [
+    {
+      "case_id": "solar-2026-08-12-leon",
+      "name": "León, Spain — total solar eclipse",
+      "event_time_utc": "2026-08-12T16:00:00Z",
+      "latitude": 42.6,
+      "longitude": -5.5703,
+      "elevation_m": 844,
+      "expected_eclipse_type": "total",
+      "expected_contacts_utc": {
+        "C1": "2026-08-12T17:32:00Z",
+        "C2": "2026-08-12T18:28:00Z",
+        "C3": "2026-08-12T18:30:00Z",
+        "C4": "2026-08-12T19:22:00Z"
+      },
+      "contact_tolerance_seconds": 120,
+      "source_precision_seconds": 60,
+      "source_url": "https://science.nasa.gov/eclipses/future-eclipses/total-solar-eclipse-on-august-12-2026/",
+      "source_notes": "NASA lists local contact times rounded to the minute. Converted from Europe/Madrid summer time (CEST, UTC+02:00). Observer coordinates are the project's catalogue point for León; NASA's city table does not publish the exact observing coordinates."
+    },
+    {
+      "case_id": "solar-2024-04-08-dallas",
+      "name": "Dallas, Texas — total solar eclipse",
+      "event_time_utc": "2024-04-08T18:00:00Z",
+      "latitude": 32.7831,
+      "longitude": -96.8067,
+      "elevation_m": 128,
+      "expected_eclipse_type": "total",
+      "expected_contacts_utc": {
+        "C1": "2024-04-08T17:23:00Z",
+        "C2": "2024-04-08T18:40:00Z",
+        "C3": "2024-04-08T18:44:00Z",
+        "C4": "2024-04-08T20:02:00Z"
+      },
+      "expected_maximum_utc": "2024-04-08T18:42:00Z",
+      "contact_tolerance_seconds": 180,
+      "maximum_tolerance_seconds": 180,
+      "source_precision_seconds": 60,
+      "source_url": "https://science.nasa.gov/eclipses/future-eclipses/eclipse-2024/where-when/",
+      "source_notes": "NASA local circumstances are rounded to the minute and shown in CDT (UTC-05:00), converted here to UTC. Coordinates are approximate Dallas city-centre coordinates, not a station-level coordinate published by NASA."
+    },
+    {
+      "case_id": "solar-2023-10-14-albuquerque",
+      "name": "Albuquerque, New Mexico — annular solar eclipse",
+      "event_time_utc": "2023-10-14T16:30:00Z",
+      "latitude": 35.0845,
+      "longitude": -106.6511,
+      "elevation_m": 1511,
+      "expected_eclipse_type": "annular",
+      "expected_contacts_utc": {
+        "C1": "2023-10-14T15:13:00Z",
+        "C2": "2023-10-14T16:34:00Z",
+        "C3": "2023-10-14T16:39:00Z",
+        "C4": "2023-10-14T18:09:00Z"
+      },
+      "expected_maximum_utc": "2023-10-14T16:35:00Z",
+      "contact_tolerance_seconds": 180,
+      "maximum_tolerance_seconds": 180,
+      "source_precision_seconds": 60,
+      "source_url": "https://science.nasa.gov/eclipses/future-eclipses/eclipse-2023/where-when/",
+      "source_notes": "NASA local circumstances are rounded to the minute and shown in MDT (UTC-06:00), converted here to UTC. Coordinates are approximate Albuquerque city-centre coordinates, not a station-level coordinate published by NASA."
+    },
+    {
+      "case_id": "solar-2022-10-25-london-partial",
+      "name": "London, United Kingdom — partial solar eclipse",
+      "event_time_utc": "2022-10-25T11:00:07Z",
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "elevation_m": 11,
+      "expected_eclipse_type": "partial",
+      "expected_contacts_utc": {
+        "C1": "2022-10-25T09:09:00Z",
+        "C4": "2022-10-25T10:51:00Z"
+      },
+      "expected_maximum_utc": "2022-10-25T09:59:00Z",
+      "contact_tolerance_seconds": 180,
+      "maximum_tolerance_seconds": 180,
+      "source_precision_seconds": 60,
+      "source_url": "https://skyandtelescope.org/stargazing-and-observing/solar-and-lunar-eclipses-in-2022/",
+      "source_notes": "The published local timetable lists London first contact 10:09, maximum 10:59 and end 11:51 BST. Times are converted to UTC (BST=UTC+01:00 on 2022-10-25). Coordinates are approximate London city-centre coordinates, not a survey station. NASA's GSFC Solar Eclipse Search Engine independently identifies 2022-10-25 as a partial eclipse and gives greatest eclipse at 11:00:07 UT; see https://eclipse.gsfc.nasa.gov/SEsearch/SEdata.php?Ecl=+20221025."
+    }
+  ],
+  "global_maximum_cases": [
+    {
+      "case_id": "solar-2026-08-12-global-maximum",
+      "name": "2026-08-12 — geocentric greatest eclipse",
+      "event_time_utc": "2026-08-12T17:00:00Z",
+      "expected_maximum_utc": "2026-08-12T17:46:00Z",
+      "tolerance_seconds": 30,
+      "source_url": "https://eclipse.gsfc.nasa.gov/OH/OH2026.html",
+      "source_notes": "NASA's 2026 eclipse catalogue rounds greatest eclipse to 17:46 UT and lists ΔT=75.4 s. The comparison uses a 30-second tolerance because the published time is rounded to the minute; the project calculates with DE440s/Skyfield."
+    },
+    {
+      "case_id": "solar-2023-04-20-hybrid-global-maximum",
+      "name": "2023-04-20 — hybrid solar eclipse, geocentric greatest eclipse",
+      "event_time_utc": "2023-04-20T04:16:44.8Z",
+      "expected_maximum_utc": "2023-04-20T04:16:44.8Z",
+      "tolerance_seconds": 30,
+      "expected_eclipse_type": "hybrid",
+      "source_url": "https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2023Apr20Hbeselm.html",
+      "source_notes": "NASA GSFC identifies this as a hybrid solar eclipse and publishes the instant of greatest eclipse as 04:16:44.8 UT. This regression checks the geocentric greatest-eclipse epoch only; the expected_eclipse_type field records the source's event classification and is not a computed classification at every location. NASA's published Besselian realization uses VSOP87/ELP2000-85 and Delta-T=70.3 s; EclipseKit's configured DE440s realization may differ slightly, so the 30-second tolerance is a screening threshold, not a universal accuracy claim."
+    }
+  ]
+}

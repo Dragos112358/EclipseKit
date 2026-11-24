@@ -1,0 +1,71 @@
+# Python environments, bytecode and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_*/
+.pytest_phase*/
+.pytest_tmp/
+.pytest-tmp/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local astronomy data: do NOT commit DEM rasters, kernels, city catalogues,
+# checkpoints or personal validation outputs. Only the nine curated public
+# reference fixtures listed below are allowed into the public repository.
+/data/*
+!/data/validation/
+/data/validation/*
+!/data/validation/reference_cases.json
+!/data/validation/path_reference_manifest.json
+!/data/validation/global_path_2017-08-21.csv
+!/data/validation/global_path_2019-07-02.csv
+!/data/validation/global_path_2020-06-21.csv
+!/data/validation/global_path_2026-08-12.csv
+!/data/validation/global_corridor_2017_nasa.csv
+!/data/validation/besselian_1999_reference.json
+!/data/validation/besselian_1999_aug11_nasa.json
+
+# Local trained model weights and binary scientific assets
+/models/
+*.pt
+*.pth
+*.ckpt
+*.bsp
+*.IMG
+*.LBL
+*.img
+*.lbl
+*.cub
+*.jp2
+*.tif
+*.tiff
+*.geotiff
+*.npz
+*.npy
+
+# Generated reports/results and local research source
+/reports/
+/results/
+/reference/legacy_server_source.txt
+
+# Local archives and editor state
+*.zip
+*.7z
+*.rar
+.idea/
+.vscode/
+
+# Historical local phase runbooks and machine-specific integration logs
+/INTEGRATION_STATUS.md
+/PHASE*_APPLY.md
+/PHASE*_FILE_MANIFEST.txt
+/PHASE*_REPAIR.ps1

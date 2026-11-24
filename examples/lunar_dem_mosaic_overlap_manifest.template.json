@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "name": "Lunar DEM overlap audit template",
+  "product_id": "eclipsekit-lunar-dem-overlap-audit",
+  "sources": [
+    {
+      "name": "west tile",
+      "image_path": "../data/west.img",
+      "label_path": "../data/west.lbl"
+    },
+    {
+      "name": "east tile",
+      "image_path": "../data/east.img",
+      "label_path": "../data/east.lbl"
+    }
+  ]
+}

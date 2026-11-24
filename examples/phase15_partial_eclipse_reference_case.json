@@ -1,0 +1,19 @@
+{
+  "case_id": "solar-2022-10-25-london-partial",
+  "name": "London, United Kingdom — partial solar eclipse",
+  "event_time_utc": "2022-10-25T11:00:07Z",
+  "latitude": 51.5074,
+  "longitude": -0.1278,
+  "elevation_m": 11,
+  "expected_eclipse_type": "partial",
+  "expected_contacts_utc": {
+    "C1": "2022-10-25T09:09:00Z",
+    "C4": "2022-10-25T10:51:00Z"
+  },
+  "expected_maximum_utc": "2022-10-25T09:59:00Z",
+  "contact_tolerance_seconds": 180,
+  "maximum_tolerance_seconds": 180,
+  "source_precision_seconds": 60,
+  "source_url": "https://skyandtelescope.org/stargazing-and-observing/solar-and-lunar-eclipses-in-2022/",
+  "source_notes": "The published local timetable lists London first contact 10:09, maximum 10:59 and end 11:51 BST. Times are converted to UTC (BST=UTC+01:00 on 2022-10-25). Coordinates are approximate London city-centre coordinates, not a survey station. NASA's GSFC Solar Eclipse Search Engine independently identifies 2022-10-25 as a partial eclipse and gives greatest eclipse at 11:00:07 UT; see https://eclipse.gsfc.nasa.gov/SEsearch/SEdata.php?Ecl=+20221025."
+}

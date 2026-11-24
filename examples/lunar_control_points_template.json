@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "dataset_id": "SYNTHETIC-ONLY-EXAMPLE",
+  "title": "Synthetic lunar DEM control-point schema example — not scientific data",
+  "source": {
+    "name": "Synthetic fixture; replace with a real independent observation source",
+    "uri": "https://example.invalid/replace-with-real-source",
+    "doi": null,
+    "independent_of_test_dem": false,
+    "independence_statement": "Synthetic example values are not observations and must never be used to claim DEM accuracy."
+  },
+  "coordinates": {
+    "coordinate_system_name": "MOON_ME_DE421",
+    "latitude_type": "planetocentric",
+    "longitude_direction": "east",
+    "longitude_domain": "-180_180",
+    "vertical_datum": "radial height above the 1737400 m spherical reference radius",
+    "reference_radius_m": 1737400.0,
+    "value_interpretation": "height",
+    "value_unit": "m"
+  },
+  "points": [
+    {
+      "point_id": "SYNTHETIC-001",
+      "latitude_deg": 0.0,
+      "longitude_deg": 0.0,
+      "value_m": 125.0,
+      "uncertainty_1sigma_m": 1.0
+    },
+    {
+      "point_id": "SYNTHETIC-002",
+      "latitude_deg": 1.0,
+      "longitude_deg": 2.0,
+      "value_m": -840.0,
+      "uncertainty_1sigma_m": 2.0
+    }
+  ]
+}
