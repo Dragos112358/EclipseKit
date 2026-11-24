@@ -117,6 +117,13 @@ def test_global_case_rejects_invalid_records(raw, message):
         ReferenceGlobalMaximumCase.from_mapping(raw)
 
 
+def test_global_case_normalizes_optional_eclipse_type():
+    case = ReferenceGlobalMaximumCase.from_mapping(
+        {**BASE_GLOBAL, "expected_eclipse_type": "HYBRID"}
+    )
+    assert case.expected_eclipse_type == "hybrid"
+
+
 def test_load_reference_cases_rejects_missing_file_and_non_object_root(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_reference_cases(tmp_path / "missing.json")

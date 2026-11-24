@@ -36,15 +36,15 @@ class LunarLimbCorrector:
 
     @classmethod
     def from_checkpoint(cls, path: str | Path, *, device: str = "cpu") -> "LunarLimbCorrector":
+        checkpoint_path = Path(path).expanduser()
+        if not checkpoint_path.is_file():
+            raise FileNotFoundError(f"Lunar-limb checkpoint not found: {checkpoint_path}")
+
         try:
             import torch
             import torch.nn as nn
         except ImportError as exc:  # pragma: no cover
             raise ImportError("Lunar limb correction requires PyTorch: pip install 'eclipsekit[limb]'") from exc
-
-        checkpoint_path = Path(path).expanduser()
-        if not checkpoint_path.is_file():
-            raise FileNotFoundError(f"Lunar-limb checkpoint not found: {checkpoint_path}")
 
         # The source checkpoint is a state-dict + primitive metadata. The safe
         # weights-only loader avoids unpickling arbitrary Python objects.
@@ -227,7 +227,8 @@ class LunarLimbModelMetadata:
 
     name: str
     model_type: Literal[
-        "spherical", "gridded_dem", "pds3_dem", "pds4_dem", "geotiff_dem", "jp2_dem", "angular_profile", "neural", "custom"
+        "spherical", "gridded_dem", "pds3_dem", "pds4_dem", "geotiff_dem", "jp2_dem",
+        "angular_profile", "neural", "custom"
     ]
     source: str
     reference_frame: Literal["selenographic", "apparent_limb"] = "selenographic"
@@ -246,7 +247,8 @@ class LunarLimbModelMetadata:
         if not self.source.strip():
             raise ValueError("Lunar-limb model source must be non-empty")
         if self.model_type not in {
-            "spherical", "gridded_dem", "pds3_dem", "pds4_dem", "geotiff_dem", "jp2_dem", "angular_profile", "neural", "custom"
+            "spherical", "gridded_dem", "pds3_dem", "pds4_dem", "geotiff_dem", "jp2_dem",
+            "angular_profile", "neural", "custom"
         }:
             raise ValueError("Unsupported lunar-limb model_type")
         if self.reference_frame not in {"selenographic", "apparent_limb"}:

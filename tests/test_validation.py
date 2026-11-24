@@ -17,6 +17,22 @@ def test_parse_utc_accepts_z_and_offsets():
     assert parse_utc_datetime("2026-08-12T20:00:00+03:00").isoformat() == "2026-08-12T17:00:00+00:00"
 
 
+def test_parse_utc_accepts_python310_single_digit_fractional_seconds():
+    parsed = parse_utc_datetime("2023-04-20T04:16:44.8Z")
+    assert parsed.isoformat() == "2023-04-20T04:16:44.800000+00:00"
+
+
+def test_parse_utc_pads_and_truncates_fractional_seconds_to_microseconds():
+    assert parse_utc_datetime("2023-04-20T04:16:44.12Z").microsecond == 120000
+    assert parse_utc_datetime("2023-04-20T04:16:44.12345Z").microsecond == 123450
+    assert parse_utc_datetime("2023-04-20T04:16:44.123456789Z").microsecond == 123456
+
+
+def test_parse_utc_accepts_fractional_seconds_with_explicit_offset():
+    parsed = parse_utc_datetime("2023-04-20T07:16:44.8+03:00")
+    assert parsed.isoformat() == "2023-04-20T04:16:44.800000+00:00"
+
+
 def test_parse_utc_rejects_naive_timestamp():
     with pytest.raises(ValueError, match="explicit UTC offset"):
         parse_utc_datetime("2026-08-12T17:00:00")
@@ -59,17 +75,24 @@ def test_reference_local_case_rejects_unknown_contact():
         ReferenceLocalCase.from_mapping(raw)
 
 
-def test_reference_suite_fixture_has_four_local_cases_and_global_case():
+def test_reference_suite_fixture_has_four_local_and_two_global_cases():
     import pathlib
 
     fixture = pathlib.Path(__file__).parents[1] / "data" / "validation" / "reference_cases.json"
     local, global_cases = load_reference_cases(fixture)
     assert len(local) == 4
-    assert any(case.expected_eclipse_type == "partial" for case in local)
+    assert {case.case_id for case in local} == {
+        "solar-2026-08-12-leon",
+        "solar-2024-04-08-dallas",
+        "solar-2023-10-14-albuquerque",
+        "solar-2022-10-25-london-partial",
+    }
     assert len(global_cases) == 2
+    assert {case.case_id for case in global_cases} == {
+        "solar-2026-08-12-global-maximum",
+        "solar-2023-04-20-hybrid-global-maximum",
+    }
     assert global_cases[0].expected_maximum_utc == "2026-08-12T17:46:00Z"
-    hybrid = next(case for case in global_cases if case.expected_eclipse_type == "hybrid")
-    assert hybrid.expected_maximum_utc == "2023-04-20T04:16:44.8Z"
 
 
 def test_load_reference_cases_rejects_unknown_schema(tmp_path):
@@ -174,10 +197,8 @@ def test_run_validation_suite_with_fake_engine_passes():
         "expected_maximum_utc": "2026-08-12T17:46:00Z",
         "tolerance_seconds": 10,
         "source_url": "https://example.org/global",
-        "expected_eclipse_type": "hybrid",
     })]
     report = run_validation_suite(_FakeEngine(), local, global_cases)
     assert report["status"] == "PASS"
     assert report["local_cases"][0]["status"] == "PASS"
     assert report["global_maximum_cases"][0]["status"] == "PASS"
-    assert report["global_maximum_cases"][0]["reference_eclipse_type"] == "hybrid"

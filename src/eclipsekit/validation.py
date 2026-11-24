@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
+import re
 from typing import Any, Iterable, Mapping
 
 from .models import Observer
@@ -30,12 +31,35 @@ def _finite_number(value: Any, field: str) -> float:
     return number
 
 
+_ISO_FRACTIONAL_SECONDS = re.compile(
+    r"^(?P<whole>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})"
+    r"\.(?P<fraction>\d+)"
+    r"(?P<offset>Z|[+-]\d{2}:\d{2})?$"
+)
+
+
+def _normalize_iso_fraction_for_python310(value: str) -> str:
+    """Normalize ISO fractional seconds to Python 3.10's 3/6-digit grammar.
+
+    Python 3.11 broadened ``fromisoformat`` to accept arbitrary ISO 8601
+    fractional-second lengths. Python 3.10 accepts only 3 or 6 digits. Pad
+    shorter fractions and truncate precision beyond microseconds, matching
+    datetime's microsecond resolution.
+    """
+    match = _ISO_FRACTIONAL_SECONDS.fullmatch(value)
+    if match is None:
+        return value
+    fraction = (match.group("fraction") + "000000")[:6]
+    return f"{match.group('whole')}.{fraction}{match.group('offset') or ''}"
+
+
 def parse_utc_datetime(value: str) -> datetime:
     """Parse an ISO-8601 timestamp that includes an explicit UTC offset."""
     if not isinstance(value, str) or not value.strip():
         raise ValueError("UTC timestamp must be a non-empty ISO-8601 string")
+    text = _normalize_iso_fraction_for_python310(value.strip())
     try:
-        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError as exc:
         raise ValueError(f"Invalid ISO-8601 timestamp: {value!r}") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
@@ -163,9 +187,10 @@ class ReferenceGlobalMaximumCase:
             if not str(value[key]).strip():
                 raise ValueError(f"Global reference field {key!r} must be non-empty")
         expected_type = value.get("expected_eclipse_type")
-        if expected_type is not None and str(expected_type).casefold() not in {
-            "total", "annular", "partial", "hybrid"
-        }:
+        allowed_types = {"total", "annular", "partial", "hybrid"}
+        if expected_type is not None and (
+            not isinstance(expected_type, str) or expected_type.casefold() not in allowed_types
+        ):
             raise ValueError(
                 "global expected_eclipse_type must be total, annular, partial, hybrid, or omitted"
             )
@@ -175,7 +200,7 @@ class ReferenceGlobalMaximumCase:
             expected_maximum_utc=str(value["expected_maximum_utc"]),
             tolerance_seconds=tolerance, source_url=str(value["source_url"]),
             source_notes=str(value.get("source_notes", "")),
-            expected_eclipse_type=(str(expected_type).casefold() if expected_type else None),
+            expected_eclipse_type=(expected_type.casefold() if expected_type is not None else None),
         )
 
 
@@ -329,7 +354,6 @@ def run_global_maximum_reference_cases(
             "case_id": case.case_id,
             "name": case.name,
             "status": status,
-            "reference_eclipse_type": case.expected_eclipse_type,
             "source_url": case.source_url,
             "source_notes": case.source_notes,
             "check": check,
