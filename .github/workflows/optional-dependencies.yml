@@ -1,0 +1,39 @@
+name: EclipseKit optional dependency tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  optional-dependencies:
+    name: Python 3.12 · Ubuntu · PyTorch + Rasterio
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project and optional dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,limb,raster]" pillow
+
+      - name: Verify optional dependencies are available
+        run: |
+          python -c "import torch, rasterio, PIL; print('PyTorch:', torch.__version__); print('Rasterio:', rasterio.__version__); print('Pillow:', PIL.__version__)"
+
+      - name: Run complete test suite with optional dependencies
+        run: python -m pytest -q
