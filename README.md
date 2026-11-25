@@ -1523,7 +1523,7 @@ See [`docs/PERFORMANCE_AND_REGRESSION.md`](docs/PERFORMANCE_AND_REGRESSION.md) a
 
 ---
 
-# Exports and GIS integration
+# Exports and GIS integration (Geographic Information System)
 
 City visibility hits, global shadow paths and Phase 7.3 shadow corridors can be exported to standard GeoJSON. City hits and corridors can also be exported to CSV, and corridors to KML.
 
