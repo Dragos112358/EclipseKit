@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from scripts.validate_lunar_references import (
-    compare_case, load_reference, reference_moon_radius_overrides, validate_events,
+    compare_case, load_reference, parse_ut1, reference_moon_radius_overrides, validate_events,
 )
 
 REFERENCE_PATH = (
@@ -13,6 +14,19 @@ REFERENCE_PATH = (
     / "reference_data"
     / "lunar_eclipse_eclipsewise_2022_2028.json"
 )
+
+
+def test_parse_ut1_accepts_variable_fractional_precision():
+    expected = datetime(2025, 9, 7, 15, 28, 6, 100000)
+
+    assert parse_ut1("2025-09-07T15:28:06.1") == expected
+    assert parse_ut1("2025-09-07T15:28:06.100 UT1") == expected
+    assert parse_ut1("2025-09-07T15:28:06.100000Z") == expected
+
+
+def test_parse_ut1_rejects_malformed_timestamp():
+    with pytest.raises(ValueError, match="invalid UT1 timestamp"):
+        parse_ut1("2025-09-07 15:28")
 
 
 def test_external_reference_matrix_is_well_formed_and_covers_all_types():

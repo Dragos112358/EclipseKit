@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,16 +25,46 @@ CONTACT_NAMES = ("P1", "U1", "U2", "greatest", "U3", "U4", "P4")
 NASA_TYPE_MAP = {"N": "penumbral", "P": "partial", "T": "total"}
 
 
+_UT1_TIMESTAMP_RE = re.compile(
+    r"^(?P<date>\d{4}-\d{2}-\d{2})[Tt ]"
+    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
+    r"(?:\.(?P<fraction>\d+))?$"
+)
+
+
 def parse_ut1(value: str | None) -> datetime | None:
-    """Parse a reference ISO timestamp or EclipseKit's ISO timestamp with UT1 suffix."""
+    """Parse a UT1 civil timestamp consistently on Python 3.10+.
+
+    EclipseWise stores fractional seconds with variable precision (often one
+    decimal place), while EclipseKit appends the explicit ``UT1`` scale label.
+    Python 3.10's ``datetime.fromisoformat()`` accepts a narrower set of ISO
+    forms than Python 3.11+, so normalize the fractional part and construct the
+    datetime directly instead of relying on version-dependent parsing.
+    Fractions beyond microsecond precision are truncated, matching datetime's
+    native resolution.
+    """
     if value is None:
         return None
     cleaned = value.strip()
     if cleaned.endswith(" UT1"):
-        cleaned = cleaned[:-4]
-    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-4].strip()
+    if cleaned.endswith(("Z", "z")):
         cleaned = cleaned[:-1]
-    return datetime.fromisoformat(cleaned)
+
+    match = _UT1_TIMESTAMP_RE.fullmatch(cleaned)
+    if match is None:
+        raise ValueError(f"invalid UT1 timestamp: {value!r}")
+
+    fraction = (match.group("fraction") or "")[:6].ljust(6, "0")
+    return datetime(
+        int(match.group("date")[:4]),
+        int(match.group("date")[5:7]),
+        int(match.group("date")[8:10]),
+        int(match.group("hour")),
+        int(match.group("minute")),
+        int(match.group("second")),
+        int(fraction or "0"),
+    )
 
 
 def load_reference(path: Path) -> dict[str, Any]:
