@@ -58,10 +58,29 @@ The result provides:
 - the selected civil calendar and scientific warnings.
 
 The geocentric contact instants are independent of where an observer is located.
-`lunar_eclipse_city_visibility()` separately calculates topocentric Moon altitude
-at greatest eclipse and at each geocentric contact. It reports which phases occur
-while the Moon is above the requested altitude threshold; it does not invent
-local contact times or substitute moonrise/moonset for a geocentric contact.
+`lunar_eclipse_local_visibility(observer, when)` separately solves topocentric
+moonrise/moonset and intersects above-horizon intervals with P1--P4, U1--U4 and
+U2--U3. It therefore reports cases where only part of an eclipse is locally
+visible, for example when the Moon rises after P1 or sets before P4. Its default
+horizon crossing uses the lunar upper limb; refraction follows the engine's
+atmosphere configuration, and a caller-supplied `HorizonProfile` can represent a
+measured skyline. Use `sample_interval_seconds` to control the skyline scan
+(default 300 s; 30–60 s is preferable for a detailed mask). The observer's
+WGS84 elevation is included. An explicit `pressure_mbar` is station pressure;
+with the default pressure, Skyfield estimates pressure from observer elevation.
+The global contacts remain unchanged. `observable_intervals` are clipped to
+P1--P4; `phase_visibility` separately reports the visible portions of P1--P4,
+U1--U4 and U2--U3. Their boundary labels retain P1/P4, U1/U4, U2/U3 or the
+local moonrise/moonset that clipped the interval. `horizon_crossings` can also
+include rise/set events in the surrounding search margin.
+
+`lunar_eclipse_city_visibility()` retains its fast greatest-eclipse filter by
+default. Use `visibility_window="any"` to screen the entire P1--P4 interval for
+cities that see at least part of the eclipse. This catalogue scan is sampled and
+geometric; use `lunar_eclipse_local_visibility()` for refined local crossings,
+refraction and skyline masks. See
+[LUNAR_ECLIPSE_METHODOLOGY.md](LUNAR_ECLIPSE_METHODOLOGY.md) for the assumptions,
+validation results and complete local-visibility example.
 
 ## Default shadow model: Herald--Sinnott oblate Earth
 

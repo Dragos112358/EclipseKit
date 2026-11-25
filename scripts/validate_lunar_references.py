@@ -16,6 +16,7 @@ from typing import Any
 
 from eclipsekit import EclipseEngine
 from eclipsekit.earth_orientation import EarthOrientationConfig
+from eclipsekit.lunar_eclipse import MEAN_MOON_RADIUS_KM
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REFERENCE = ROOT / "tests" / "reference_data" / "lunar_eclipse_eclipsewise_2022_2028.json"
@@ -62,6 +63,27 @@ def load_reference(path: Path) -> dict[str, Any]:
         if case["contacts_ut1"]["greatest"] != case["greatest_ut1"]:
             raise ValueError(f"greatest contact and greatest_ut1 differ for {date}")
     return payload
+
+
+def reference_moon_radius_overrides(references: dict[str, Any]) -> dict[str, float]:
+    """Validate and return per-event Moon radii used only for source reproduction."""
+    overrides: dict[str, float] = {}
+    for case in references["cases"]:
+        raw_radius = case.get("moon_radius_km")
+        if raw_radius is None:
+            continue
+        try:
+            radius = float(raw_radius)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"invalid moon_radius_km for {case.get('date', '<unknown>')}"
+            ) from exc
+        if not math.isfinite(radius) or radius <= 0.0:
+            raise ValueError(
+                f"moon_radius_km for {case.get('date', '<unknown>')} must be finite and positive"
+            )
+        overrides[str(case["date"])] = radius
+    return overrides
 
 
 def compare_case(
@@ -320,6 +342,10 @@ def main() -> int:
         help="Optional fixed Delta-T in seconds for reproducing a specific reference page",
     )
     parser.add_argument(
+        "--use-reference-moon-radii", action="store_true",
+        help="Use explicitly stored per-event lunar radii to reproduce rounded source semidiameters",
+    )
+    parser.add_argument(
         "--json-output", type=Path, help="Optional path for a machine-readable report"
     )
     args = parser.parse_args()
@@ -333,6 +359,8 @@ def main() -> int:
     ):
         if not math.isfinite(value) or value < 0.0:
             parser.error(f"{name} must be finite and non-negative")
+        if name in {"contact step", "solver tolerance"} and value == 0.0:
+            parser.error(f"{name} must be greater than zero")
 
     if args.boundary_samples < 24:
         parser.error("boundary samples must be at least 24")
@@ -364,7 +392,35 @@ def main() -> int:
             contact_tolerance_seconds=args.solver_tolerance_seconds,
             boundary_samples=args.boundary_samples,
         )
-        payloads = [event.to_dict(calendar="gregorian") for event in events]
+        radius_overrides = (
+            reference_moon_radius_overrides(selected_references)
+            if args.use_reference_moon_radii else {}
+        )
+        payloads = []
+        for event in events:
+            initial_payload = event.to_dict(calendar="gregorian")
+            event_date = str(initial_payload["maximum_ut1"])[:10]
+            reference_radius = radius_overrides.get(event_date)
+            if reference_radius is not None:
+                # Greatest eclipse is based on the shadow axis and does not depend
+                # on lunar-disc radius. Re-solve contacts/magnitudes at this TT epoch.
+                event = engine.calculate_lunar_eclipse(
+                    event.maximum,
+                    calendar="gregorian",
+                    search_half_window_hours=18.0,
+                    contact_search_half_window_hours=8.0,
+                    contact_step_seconds=args.contact_step_seconds,
+                    contact_tolerance_seconds=args.solver_tolerance_seconds,
+                    moon_radius_km=reference_radius,
+                    shadow_enlargement=float(references["reference_shadow_enlargement"]),
+                    shadow_model="herald_sinnott",
+                    boundary_samples=args.boundary_samples,
+                )
+                if event is None:
+                    raise RuntimeError(
+                        f"event {event_date} disappeared when applying its reference Moon radius"
+                    )
+            payloads.append(event.to_dict(calendar="gregorian"))
         report = validate_events(
             selected_references,
             payloads,
@@ -380,6 +436,12 @@ def main() -> int:
             "contact_step_seconds": args.contact_step_seconds,
             "solver_tolerance_seconds": args.solver_tolerance_seconds,
             "delta_t_seconds": args.delta_t_seconds,
+            "default_moon_radius_km": MEAN_MOON_RADIUS_KM,
+            "moon_radius_policy": (
+                "reference-specific overrides" if args.use_reference_moon_radii
+                else "mean lunar radius"
+            ),
+            "reference_moon_radius_overrides_km": radius_overrides,
         }
     except Exception as exc:  # keep CLI diagnostics actionable for local runs
         parser.exit(2, f"Validation could not run: {type(exc).__name__}: {exc}\n")
@@ -395,6 +457,10 @@ def main() -> int:
         f"contact_step={args.contact_step_seconds:g}s; "
         f"solver_tolerance={args.solver_tolerance_seconds:g}s; Delta-T={delta_t_label}"
     )
+    if args.use_reference_moon_radii:
+        print(f"Moon-radius policy: reference-specific overrides {radius_overrides}")
+    else:
+        print(f"Moon-radius policy: mean lunar radius ({MEAN_MOON_RADIUS_KM:g} km)")
     print(
         f"Lunar reference validation: {summary['passed']}/{summary['cases']} passed; "
         f"{summary['failed']} failed; "

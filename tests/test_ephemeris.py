@@ -133,6 +133,27 @@ def test_known_jpl_kernel_uses_official_naif_directory(fake_skyfield, tmp_path):
     assert fake_skyfield["loaded_paths"] == [str(tmp_path / "de440s.bsp")]
 
 
+def test_de430_kernel_name_downloads_from_official_naif_directory(fake_skyfield, tmp_path):
+    context = EphemerisContext("de430", cache_dir=tmp_path)
+
+    loader = FakeLoader.instances[-1]
+    assert loader.download_calls == [
+        "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de430.bsp"
+    ]
+    assert context.kernel_source == "de430.bsp"
+    assert fake_skyfield["loaded_paths"] == [str(tmp_path / "de430.bsp")]
+
+
+def test_missing_path_like_bsp_fails_clearly_instead_of_registry_download(
+    fake_skyfield, tmp_path
+):
+    missing = tmp_path / "data" / "de430.bsp"
+    with pytest.raises(FileNotFoundError, match="Local ephemeris kernel not found"):
+        EphemerisContext(missing, cache_dir=tmp_path / "cache")
+    assert FakeLoader.instances[-1].download_calls == []
+    assert FakeLoader.instances[-1].registry_calls == []
+
+
 def test_known_jpl_kernel_reuses_cached_file(fake_skyfield, tmp_path):
     cached = tmp_path / "de440s.bsp"
     cached.write_bytes(b"cached fake data")

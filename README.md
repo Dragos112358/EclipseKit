@@ -48,7 +48,8 @@ large external datasets out of the installed package.
 - Country/city searches: use a user-provided CSV and vectorized batch processing.
 - Geocentric lunar-eclipse analysis using the default Herald--Sinnott oblate-Earth
   shadow prescription, with penumbral/umbral classification, P1/U1/U2/maximum/
-  U3/U4/P4 contacts, separate UTC/UT1/TT output, and per-phase city visibility.
+  U3/U4/P4 contacts, separate UTC/UT1/TT output, per-phase city screening, and
+  topocentric local visibility intervals including moonrise/moonset clipping.
 - Modular lunar-limb framework: spherical baseline, caller-supplied gridded DEM, tabulated apparent-limb profile, and optional neural checkpoint adapter.
 - Import safety: importing `eclipsekit` does not download data, open a socket,
   start a thread, or load a neural model.
@@ -133,18 +134,50 @@ refined against the full non-circular boundaries. The older circular-cone
 approximation remains available with `shadow_model="circular"` for reproducing
 legacy Alpha results.
 
-Results remain experimental until independently validated with matching
-ephemeris, Earth-orientation and Delta-T inputs. The 87 km atmospheric layer is
-an empirical global prescription, not a resolved atmospheric-opacity model.
-The result serializer reports UTC, UT1 and TT separately. Local phase visibility
-is evaluated topocentrically at each geocentric contact; it does not replace
-geocentric contact times with moonrise/moonset.
+Results remain a numerical astronomy model and should be interpreted with the
+matching ephemeris, Earth-orientation, Delta-T and radius assumptions recorded.
+The 87 km atmospheric layer is an empirical global prescription, not a resolved
+atmospheric-opacity model. The result serializer reports UTC, UT1 and TT
+separately. Geocentric eclipse contacts remain unchanged by local circumstances;
+`lunar_eclipse_local_visibility()` intersects the physical P1--P4, U1--U4 and
+U2--U3 phase intervals with the selected observer's above-horizon intervals.
+Moonrise/moonset are therefore local visibility boundaries, not replacements for
+the global eclipse contacts.
+
+A local visibility query handles cases where the Moon rises after P1 or sets
+before P4. It includes the observer's elevation, optional atmospheric
+refraction, a caller-supplied `HorizonProfile`, altitude samples, and separate
+visible intervals for the penumbral, partial and total phases:
+
+```python
+from eclipsekit import EclipseEngine, Observer, HorizonProfile
+
+engine = EclipseEngine("de440s")
+site = Observer(44.4268, 26.1025, elevation_m=80.0, name="Bucharest")
+local = engine.lunar_eclipse_local_visibility(
+    site,
+    "2027-07-18",
+    apply_refraction=True,
+    sample_interval_seconds=60,
+    horizon_profile=HorizonProfile.flat(2.0, name="local skyline"),
+)
+if local is not None:
+    print(local["visibility_status"])
+    print(local["observable_intervals"])
+    print(local["phase_visibility"])
+```
+
+Use `lunar_eclipse_city_visibility(..., visibility_window="any")` for a
+sampled catalogue screen of cities that see at least part of the eclipse; use
+the single-observer method for refined local crossing times.
 
 See [docs/LUNAR_ECLIPSES.md](docs/LUNAR_ECLIPSES.md) for model equations,
-calendar semantics, time-scale assumptions and examples. For a reproducible
-16-event external regression matrix (2022–2028), see
+calendar semantics, time-scale assumptions and examples. The complete
+methodology, local-visibility options and known reference residuals are
+explained in [docs/LUNAR_ECLIPSE_METHODOLOGY.md](docs/LUNAR_ECLIPSE_METHODOLOGY.md).
+For a reproducible 16-event external regression matrix (2022–2028), see
 [docs/LUNAR_REFERENCE_VALIDATION_2022_2028.md](docs/LUNAR_REFERENCE_VALIDATION_2022_2028.md)
-and run `python scripts/validate_lunar_references.py --kernel de440s`.
+and run `python scripts/validate_lunar_references.py --kernel de430`.
 
 ## Configuration API (recommended for new code)
 
@@ -485,10 +518,14 @@ For contact times corrected by your neural lunar-limb model, pass both
 `find_solar_eclipses_by_country()` (or `search_cities()`). The result then
 contains geometric contacts and a separate `limb_corrected_contacts` mapping.
 
-The function `lunar_eclipse_city_visibility()` evaluates topocentric Moon
-altitude at greatest eclipse and at each geocentric P1/U1/U2/U3/U4/P4 contact.
-It reports phase visibility for the supplied city catalogue; it does not solve
-local moonrise/moonset or replace the geocentric contact instants.
+The function `lunar_eclipse_city_visibility()` evaluates catalogue visibility.
+Its default `visibility_window="greatest"` retains the original fast maximum-only
+filter; `visibility_window="any"` screens the complete P1--P4 interval and can
+include locations where the Moon is below the horizon at greatest eclipse.
+For precise local moonrise/moonset, refraction, skyline masks and intervals for
+the penumbral/partial/total phases, use
+`EclipseEngine.lunar_eclipse_local_visibility(observer, when)`. See
+[docs/LUNAR_ECLIPSE_METHODOLOGY.md](docs/LUNAR_ECLIPSE_METHODOLOGY.md).
 
 
 ## Validate the supplied local assets
@@ -521,6 +558,7 @@ Neither the checkpoint nor the city CSV is included in the PyPI wheel.
 - `EclipseEngine.find_lunar_eclipses(...)`
 - `EclipseEngine.find_next_lunar_eclipse(...)`
 - `EclipseEngine.lunar_eclipse_city_visibility(...)`
+- `EclipseEngine.lunar_eclipse_local_visibility(...)`
 - `EclipseEngine.format_report(...)`
 - `CityCatalog.from_csv(...)`
 - `LunarLimbCorrector.from_checkpoint(...)`

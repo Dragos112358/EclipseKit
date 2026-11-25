@@ -1,3 +1,20 @@
+## Unreleased — Herald--Sinnott oblate-Earth lunar-eclipse engine
+
+- Made the Herald--Sinnott (2014) 87 km notional eclipse-forming-layer model
+  the default lunar shadow prescription, including its angle-dependent oblate-
+  Earth penumbral and umbral boundaries; retained the circular model only as an
+  explicit legacy/reproducibility option.
+- Refined P1/U1/U2/U3/U4/P4 contacts as spherical tangencies against the full
+  non-circular shadow boundary. Classification and magnitudes use the signed
+  shortest angular distance to that boundary.
+- Added a rounded-input geometry regression for the 2025-03-14 EclipseWise
+  total lunar eclipse reference; this is a geometry regression, not a full
+  ephemeris/contact-time certification.
+- Added separate UTC, UT1 and TT timestamps to lunar-eclipse serialization,
+  and phase-by-phase topocentric visibility at city-catalogue locations.
+- Documented the Julian/Gregorian civil-calendar conventions and their
+  separation from continuous TT/UT1 time scales.
+
 ## Unreleased — Phase 15 Alpha software-release profile
 
 - Added an explicit `--release-profile alpha` mode to `eclipsekit-certify`.

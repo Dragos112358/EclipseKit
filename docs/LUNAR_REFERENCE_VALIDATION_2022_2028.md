@@ -22,10 +22,12 @@ new retrieval date.
 ## How to run
 
 From the repository root, with the project environment active and the JPL
-DE440s kernel available through Skyfield:
+DE430 kernel available through the EclipseKit cache or as a local BSP file.
+DE430 matches the ephemeris convention named by the frozen EclipseWise source
+pages:
 
 ```powershell
-python scripts/validate_lunar_references.py --kernel de440s
+python scripts/validate_lunar_references.py --kernel de430
 ```
 
 To save a machine-readable report:
@@ -86,6 +88,48 @@ ending qualifier) but reports a different penumbral magnitude under its own
 shadow convention. This case is included to probe event detection and contact
 existence near the penumbral threshold. It should not be used to tune a model
 against NASA's Danjon magnitude.
+
+The source publishes a rounded lunar semidiameter and geocentric Moon distance
+for this event. Inverting those rounded values gives a source-equivalent lunar
+disc radius of 1737.979126 km. This value is stored only as a reference-specific
+reproduction override; the calculation library keeps its default mean lunar
+radius of 1737.4 km. Use `--use-reference-moon-radii` only when comparing against
+the frozen source convention, not for ordinary predictions.
+
+The DE430 kernel is not bundled with the project. To download it into the
+EclipseKit ephemeris cache automatically, use the kernel name `de430`. A local
+path such as `data\de430.bsp` is accepted only after that file actually exists.
+
+For a source-convention reproduction of the 18 July 2027 case:
+
+```powershell
+python scripts/validate_lunar_references.py `
+  --kernel de430 `
+  --start 2027-07-18 `
+  --end 2027-07-19 `
+  --delta-t-seconds 72.7 `
+  --boundary-samples 384 `
+  --contact-step-seconds 60 `
+  --solver-tolerance-seconds 0.01 `
+  --use-reference-moon-radii `
+  --json-output reports/lunar-july-2027-reference.json
+```
+
+The inferred radius brought the diagnostic P1/P4 differences to approximately
++22.3 s and -22.1 s, respectively, with greatest eclipse approximately 2 s
+from the published value. This is inside the matrix's 30 s screening threshold
+for the supplied DE430/Delta-T diagnostic, but it is not a certification of
+all physical uncertainty or a claim that the rounded source radius is the
+universal lunar radius.
+
+In the standard run without `--use-reference-moon-radii`, the same development
+configuration reported **15/16 passed**. The only failure was this grazing
+case: P1 +40.51 s and P4 -33.12 s with the 1737.4 km IAU/JPL mean radius; the
+maximum was +1.63 s. Doubling `boundary_samples` to 768 and reducing the contact
+step to 30 s did not materially change the residual. This is retained as an
+explicit known source-convention mismatch rather than changing the library-wide
+physical radius or silently relaxing the 30 s contact threshold. Both modes
+should be reported separately when releasing or comparing results.
 
 ## Event matrix
 

@@ -116,7 +116,7 @@ packages = ["src/eclipsekit"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra"
+addopts = "-ra --basetemp=.pytest-tmp"
 
 [tool.ruff]
 line-length = 100

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts.validate_lunar_references import compare_case, load_reference, validate_events
+import pytest
+
+from scripts.validate_lunar_references import (
+    compare_case, load_reference, reference_moon_radius_overrides, validate_events,
+)
 
 REFERENCE_PATH = (
     Path(__file__).parent
@@ -96,3 +100,21 @@ def test_reference_comparator_reports_signed_contact_residuals():
     assert report["status"] == "PASS"
     assert report["time_deltas_seconds"]["P1"] == 12.0
     assert report["contact_details"]["P1"]["actual_ut1"] == "2025-09-07T15:28:18.000 UT1"
+
+
+def test_reference_radius_override_is_limited_to_the_2027_source_case():
+    references = load_reference(REFERENCE_PATH)
+    overrides = reference_moon_radius_overrides(references)
+
+    assert set(overrides) == {"2027-07-18"}
+    assert overrides["2027-07-18"] == pytest.approx(1737.9791264853177)
+
+
+def test_reference_radius_override_rejects_non_positive_or_non_finite_values():
+    import pytest
+
+    for value in (0.0, -1.0, float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="finite and positive"):
+            reference_moon_radius_overrides({
+                "cases": [{"date": "2099-01-01", "moon_radius_km": value}]
+            })

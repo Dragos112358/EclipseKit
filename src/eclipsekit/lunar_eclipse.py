@@ -111,53 +111,80 @@ def _contact_on_side(
     step_seconds: float,
     tolerance_seconds: float,
 ) -> float | None:
-    """Bracket with radial clearances, then refine against the exact ellipse.
+    """Find one contact on either side of greatest eclipse.
 
-    The inexpensive radial approximation locates a coarse bracket. The returned
-    contact is always the root of the signed great-circle distance to the full
-    angle-dependent boundary. If the coarse and exact signs disagree near a
-    grazing contact, a slower exact scan is used rather than silently dropping it.
+    The exact signed distance controls event/contact existence.  The inexpensive
+    radial residual is only a bracket accelerator: it is never allowed to reject
+    a contact by itself.  If its bracket misses (which can happen for a shallow
+    grazing event when the non-circular boundary changes with position angle),
+    the full interval is scanned with the exact residual before returning None.
     """
-    center_value = coarse_residual(maximum_jd)
-    if abs(center_value) <= 1e-12:
-        return maximum_jd
-    if center_value > 0.0:
-        return None
+    if direction not in (-1, 1):
+        raise ValueError("direction must be -1 or +1")
+
     step_days = step_seconds / 86400.0
     count = int(math.ceil(half_window_hours * 3600.0 / step_seconds))
+    tolerance_days = tolerance_seconds / 86400.0
+
+    exact_center = exact_residual(maximum_jd)
+    if not math.isfinite(exact_center):
+        raise ValueError("exact contact residual at greatest eclipse must be finite")
+    if exact_center > 0.0:
+        # At greatest eclipse the exact geometry says the lunar limb does not
+        # reach this boundary, so this contact pair does not exist.
+        return None
+    if abs(exact_center) <= 1e-12:
+        return maximum_jd
+
+    def refine_if_bracketed(first_jd: float, second_jd: float) -> float | None:
+        left, right = sorted((first_jd, second_jd))
+        f_left = exact_residual(left)
+        f_right = exact_residual(right)
+        if f_left == 0.0:
+            return left
+        if f_right == 0.0:
+            return right
+        if f_left * f_right > 0.0:
+            return None
+        return _bisect_zero(
+            exact_residual, left, right, tolerance_days=tolerance_days
+        )
+
+    # Fast path: use the radial approximation to locate a likely exit bracket.
+    coarse_center = coarse_residual(maximum_jd)
+    if math.isfinite(coarse_center) and coarse_center <= 0.0:
+        previous_jd = maximum_jd
+        for index in range(1, count + 1):
+            current_jd = maximum_jd + direction * index * step_days
+            current_coarse = coarse_residual(current_jd)
+            if not math.isfinite(current_coarse):
+                break
+            if current_coarse >= 0.0:
+                root = refine_if_bracketed(previous_jd, current_jd)
+                if root is not None:
+                    return root
+                break
+            previous_jd = current_jd
+
+    # Exact fallback: do not silently lose grazing contacts when the coarse
+    # curve never crosses zero or starts on the wrong side of zero.
     previous_jd = maximum_jd
+    previous_exact = exact_center
     for index in range(1, count + 1):
         current_jd = maximum_jd + direction * index * step_days
-        current_coarse = coarse_residual(current_jd)
-        if current_coarse >= 0.0:
-            left, right = sorted((previous_jd, current_jd))
-            f_left = exact_residual(left)
-            f_right = exact_residual(right)
-            if f_left * f_right <= 0.0:
-                return _bisect_zero(
-                    exact_residual, left, right,
-                    tolerance_days=tolerance_seconds / 86400.0,
-                )
-
-            # The coarse radial boundary is only a bracket estimator. For a
-            # near-grazing case its approximate root can lie just to one side of
-            # the exact one. Re-scan exact values from maximum to the search edge
-            # in that rare case, guaranteeing that an exact sign change is found.
-            exact_previous_jd = maximum_jd
-            exact_previous = exact_residual(maximum_jd)
-            for exact_index in range(1, count + 1):
-                exact_current_jd = maximum_jd + direction * exact_index * step_days
-                exact_current = exact_residual(exact_current_jd)
-                if exact_previous * exact_current <= 0.0:
-                    exact_left, exact_right = sorted((exact_previous_jd, exact_current_jd))
-                    return _bisect_zero(
-                        exact_residual, exact_left, exact_right,
-                        tolerance_days=tolerance_seconds / 86400.0,
-                    )
-                exact_previous_jd = exact_current_jd
-                exact_previous = exact_current
-            return None
+        current_exact = exact_residual(current_jd)
+        if not math.isfinite(current_exact):
+            previous_jd = current_jd
+            previous_exact = current_exact
+            continue
+        if current_exact == 0.0:
+            return current_jd
+        if math.isfinite(previous_exact) and previous_exact * current_exact < 0.0:
+            root = refine_if_bracketed(previous_jd, current_jd)
+            if root is not None:
+                return root
         previous_jd = current_jd
+        previous_exact = current_exact
     return None
 
 

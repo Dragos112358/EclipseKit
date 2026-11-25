@@ -4,7 +4,9 @@ from datetime import date
 
 import pytest
 
-from eclipsekit.lunar_eclipse import lunar_shadow_geometry, solve_lunar_eclipse
+from eclipsekit.lunar_eclipse import (
+    _contact_on_side, lunar_shadow_geometry, solve_lunar_eclipse,
+)
 from eclipsekit.timeutils import (
     calendar_from_julian_day,
     coerce_time,
@@ -274,3 +276,64 @@ def test_time_to_ut1_iso_uses_ut1_julian_day_and_calendar():
     output = time_to_ut1_iso(value, calendar="gregorian")
     assert output.endswith("UT1")
     assert output.startswith("2025-03-14T")
+
+
+def test_contact_solver_uses_exact_center_when_radial_approximation_misses_grazing_case():
+    maximum_jd = 2461605.0
+    contact_jd = maximum_jd + 120.0 / 86400.0
+
+    def exact_residual(jd: float) -> float:
+        return (jd - contact_jd) * 86400.0
+
+    # The approximate radial residual incorrectly starts outside and never
+    # brackets the contact. The exact residual still proves the overlap at max.
+    def coarse_residual(jd: float) -> float:
+        return exact_residual(jd) + 180.0
+
+    root = _contact_on_side(
+        coarse_residual,
+        exact_residual,
+        maximum_jd,
+        1,
+        half_window_hours=1.0,
+        step_seconds=60.0,
+        tolerance_seconds=0.01,
+    )
+
+    assert root is not None
+    assert (root - contact_jd) * 86400.0 == pytest.approx(0.0, abs=0.02)
+
+
+def test_contact_solver_falls_back_to_exact_scan_when_coarse_curve_never_exits():
+    maximum_jd = 2461605.0
+    contact_jd = maximum_jd + 180.0 / 86400.0
+
+    def exact_residual(jd: float) -> float:
+        return (jd - contact_jd) * 86400.0
+
+    root = _contact_on_side(
+        lambda _jd: -1.0,
+        exact_residual,
+        maximum_jd,
+        1,
+        half_window_hours=1.0,
+        step_seconds=60.0,
+        tolerance_seconds=0.01,
+    )
+
+    assert root is not None
+    assert (root - contact_jd) * 86400.0 == pytest.approx(0.0, abs=0.02)
+
+
+def test_contact_solver_does_not_create_contact_when_exact_geometry_is_outside():
+    maximum_jd = 2461605.0
+    root = _contact_on_side(
+        lambda _jd: -1.0,
+        lambda jd: 1.0 + (jd - maximum_jd) * 86400.0,
+        maximum_jd,
+        1,
+        half_window_hours=1.0,
+        step_seconds=60.0,
+        tolerance_seconds=0.01,
+    )
+    assert root is None

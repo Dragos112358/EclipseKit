@@ -2206,23 +2206,479 @@ class EclipseEngine:
         )
         return events[0] if events else None
 
+    def lunar_eclipse_local_visibility(
+        self,
+        observer: Observer,
+        when: Any,
+        *,
+        calendar: str = "historical",
+        shadow_enlargement: float = 1.0,
+        shadow_model: str = "herald_sinnott",
+        atmospheric_nel_height_km: float = 87.0,
+        flattening_coefficient: float = 0.003353,
+        boundary_samples: int = 96,
+        moon_radius_km: float = MEAN_MOON_RADIUS_KM,
+        horizon_altitude_deg: float = 0.0,
+        horizon_profile: HorizonProfile | None = None,
+        limb_visibility: str = "upper",
+        apply_refraction: bool | None = None,
+        pressure_mbar: float | None = None,
+        temperature_c: float | None = None,
+        sample_interval_seconds: float = 300.0,
+        search_margin_hours: float = 36.0,
+        include_altitude_profile: bool = True,
+    ) -> dict[str, Any] | None:
+        """Calculate the locally observable portions of a geocentric lunar eclipse.
+
+        Geocentric P1/U1/U2/greatest/U3/U4/P4 remain the eclipse's physical
+        contacts. This method independently solves when the topocentric Moon's
+        selected limb crosses the observer's horizon, then intersects those
+        above-horizon intervals with the penumbral, partial and total phases.
+
+        The observer's geodetic elevation is included by Skyfield's WGS84
+        topocentric position. Refraction is enabled by default when the active
+        engine atmosphere config enables it. Unless an explicit station pressure
+        is supplied, Skyfield's ``"standard"`` pressure estimate is used and
+        adjusted for observer elevation. ``horizon_profile`` is an optional
+        caller-supplied azimuth mask; it is not a terrain model inferred by the
+        package.
+
+        ``limb_visibility`` controls the horizon-crossing definition:
+        ``"upper"`` means any part of the lunar disc is visible (the usual
+        moonrise/moonset convention), ``"center"`` means the lunar centre is
+        above the mask, and ``"lower"`` means the entire disc is above it.
+        The returned altitude profile is sampled, while horizon crossings are
+        refined by bisection to ``root_tolerance_seconds``.
+        """
+        if not isinstance(observer, Observer):
+            raise TypeError("observer must be an Observer instance")
+        if horizon_profile is not None and not isinstance(horizon_profile, HorizonProfile):
+            raise TypeError("horizon_profile must be a HorizonProfile or None")
+        if limb_visibility not in {"upper", "center", "lower"}:
+            raise ValueError("limb_visibility must be 'upper', 'center', or 'lower'")
+        if not isinstance(include_altitude_profile, bool):
+            raise TypeError("include_altitude_profile must be a boolean")
+        if apply_refraction is None:
+            atmosphere = getattr(self.config, "atmosphere", None)
+            apply_refraction = bool(
+                getattr(atmosphere, "refraction_enabled", self.pressure_mbar > 0.0)
+            )
+        if not isinstance(apply_refraction, bool):
+            raise TypeError("apply_refraction must be a boolean")
+        if pressure_mbar is not None:
+            if isinstance(pressure_mbar, bool):
+                raise ValueError("pressure_mbar must be finite and > 0 when supplied")
+            pressure_mbar = float(pressure_mbar)
+            if not math.isfinite(pressure_mbar) or pressure_mbar <= 0.0:
+                raise ValueError("pressure_mbar must be finite and > 0 when supplied")
+        if temperature_c is None:
+            temperature_c = float(self.temperature_c)
+        elif isinstance(temperature_c, bool):
+            raise ValueError("temperature_c must be finite and above absolute zero")
+        else:
+            temperature_c = float(temperature_c)
+        if not math.isfinite(temperature_c) or temperature_c <= -273.15:
+            raise ValueError("temperature_c must be finite and above absolute zero")
+        if isinstance(moon_radius_km, bool):
+            raise ValueError("moon_radius_km must be finite and positive")
+        moon_radius_km = float(moon_radius_km)
+        if not math.isfinite(moon_radius_km) or moon_radius_km <= 0.0:
+            raise ValueError("moon_radius_km must be finite and positive")
+        if isinstance(horizon_altitude_deg, bool):
+            raise ValueError("horizon_altitude_deg must be finite and in [-10, 90]")
+        horizon_altitude_deg = float(horizon_altitude_deg)
+        if not math.isfinite(horizon_altitude_deg) or not -10.0 <= horizon_altitude_deg <= 90.0:
+            raise ValueError("horizon_altitude_deg must be finite and in [-10, 90]")
+        numeric_options = (sample_interval_seconds, search_margin_hours)
+        if any(isinstance(value, bool) for value in numeric_options):
+            raise ValueError("sampling interval and search margin must be numeric")
+        sample_interval_seconds = float(sample_interval_seconds)
+        search_margin_hours = float(search_margin_hours)
+        if not math.isfinite(sample_interval_seconds) or not 1.0 <= sample_interval_seconds <= 3600.0:
+            raise ValueError("sample_interval_seconds must be between 1 and 3600")
+        if not math.isfinite(search_margin_hours) or not 1.0 <= search_margin_hours <= 72.0:
+            raise ValueError("search_margin_hours must be between 1 and 72")
+
+        event = self.calculate_lunar_eclipse(
+            when,
+            calendar=calendar,
+            shadow_enlargement=shadow_enlargement,
+            shadow_model=shadow_model,
+            atmospheric_nel_height_km=atmospheric_nel_height_km,
+            flattening_coefficient=flattening_coefficient,
+            boundary_samples=boundary_samples,
+            moon_radius_km=moon_radius_km,
+        )
+        if event is None:
+            return None
+        contacts = event.contacts.as_dict()
+        penumbral_start = contacts.get("P1")
+        penumbral_end = contacts.get("P4")
+        if penumbral_start is None or penumbral_end is None:
+            raise RuntimeError("a lunar eclipse result must include P1 and P4")
+        event_start_jd = float(penumbral_start.tt)
+        event_end_jd = float(penumbral_end.tt)
+        if event_end_jd <= event_start_jd:
+            raise RuntimeError("lunar eclipse P4 must be later than P1")
+
+        observer_sf = self._observer(observer)
+        use_refraction = bool(apply_refraction)
+        # "standard" asks Skyfield to estimate pressure from the observer's
+        # elevation; a numeric value is interpreted as station pressure in mbar.
+        if use_refraction:
+            atmosphere_config = getattr(self, "atmosphere_config", None)
+            configured_pressure = float(getattr(
+                atmosphere_config, "pressure_mbar", self.pressure_mbar
+            ))
+            if pressure_mbar is not None:
+                pressure_for_altaz: float | str = pressure_mbar
+            elif configured_pressure > 0.0 and not math.isclose(
+                configured_pressure, 1013.25, rel_tol=0.0, abs_tol=1e-6
+            ):
+                # A non-default engine pressure is treated as a station-pressure
+                # override. The unmodified default delegates elevation scaling to Skyfield.
+                pressure_for_altaz = configured_pressure
+            else:
+                pressure_for_altaz = "standard"
+            altitude_kwargs = {
+                "temperature_C": temperature_c,
+                "pressure_mbar": pressure_for_altaz,
+            }
+        else:
+            altitude_kwargs = {}
+
+        def evaluate(jd_values: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            times = self.ts.tt_jd(jd_values)
+            observed = observer_sf.at(times).observe(self.moon).apparent()
+            altitude, azimuth, distance = observed.altaz(**altitude_kwargs)
+            altitude_values = np.asarray(altitude.degrees, dtype=np.float64)
+            azimuth_values = np.asarray(azimuth.degrees, dtype=np.float64) % 360.0
+            distance_values = np.asarray(distance.km, dtype=np.float64)
+            semidiameter = np.degrees(
+                np.arcsin(np.clip(moon_radius_km / distance_values, -1.0, 1.0))
+            )
+            if horizon_profile is None:
+                horizon_values = np.full_like(altitude_values, horizon_altitude_deg)
+            else:
+                horizon_values = np.fromiter(
+                    (horizon_altitude_deg + horizon_profile.altitude_at(float(value))
+                     for value in np.ravel(azimuth_values)),
+                    dtype=np.float64,
+                    count=azimuth_values.size,
+                ).reshape(azimuth_values.shape)
+            if limb_visibility == "upper":
+                limb_offset = semidiameter
+            elif limb_visibility == "lower":
+                limb_offset = -semidiameter
+            else:
+                limb_offset = np.zeros_like(semidiameter)
+            clearance = altitude_values + limb_offset - horizon_values
+            return altitude_values, azimuth_values, semidiameter, clearance
+
+        def scalar_clearance(jd_value: float) -> float:
+            return float(evaluate(float(jd_value))[3])
+
+        margin_days = search_margin_hours / 24.0
+        search_start_jd = event_start_jd - margin_days
+        search_end_jd = event_end_jd + margin_days
+        duration_seconds = (search_end_jd - search_start_jd) * 86400.0
+        sample_count = max(3, int(math.ceil(duration_seconds / sample_interval_seconds)) + 1)
+        sample_jds = np.linspace(search_start_jd, search_end_jd, sample_count)
+        contact_jds = [
+            float(value.tt) for value in contacts.values() if value is not None
+        ]
+        # Include every published contact and both outer eclipse boundaries exactly
+        # in the time series, regardless of the selected regular sampling cadence.
+        sample_jds = np.unique(np.concatenate((
+            sample_jds,
+            np.asarray([event_start_jd, event_end_jd, *contact_jds], dtype=np.float64),
+        )))
+        altitudes, azimuths, semidiameters, clearances = evaluate(sample_jds)
+        if not all(np.all(np.isfinite(values)) for values in (
+            altitudes, azimuths, semidiameters, clearances
+        )):
+            raise RuntimeError("topocentric lunar visibility returned non-finite geometry")
+
+        def refine_crossing(left_jd: float, right_jd: float, left_value: float) -> float:
+            left, right = float(left_jd), float(right_jd)
+            f_left = float(left_value)
+            for _ in range(80):
+                middle = (left + right) / 2.0
+                f_middle = scalar_clearance(middle)
+                if right - left <= 0.1 / 86400.0 or abs(f_middle) <= 1e-11:
+                    return middle
+                if f_left * f_middle <= 0.0:
+                    right = middle
+                else:
+                    left, f_left = middle, f_middle
+            return (left + right) / 2.0
+
+        crossings: list[dict[str, Any]] = []
+        for index in range(len(sample_jds) - 1):
+            left_value = float(clearances[index])
+            right_value = float(clearances[index + 1])
+            # Compare the visibility side rather than multiplying residuals:
+            # this also catches a root that lands exactly on a sampled epoch.
+            if (left_value >= 0.0) == (right_value >= 0.0):
+                continue
+            left_jd = float(sample_jds[index])
+            right_jd = float(sample_jds[index + 1])
+            if abs(left_value) <= 1e-13:
+                root_jd = left_jd
+            elif abs(right_value) <= 1e-13:
+                root_jd = right_jd
+            else:
+                root_jd = refine_crossing(left_jd, right_jd, left_value)
+            crossing_kind = "moonrise" if left_value < right_value else "moonset"
+            crossing_alt, crossing_az, crossing_radius, crossing_clearance = evaluate(root_jd)
+            crossings.append({
+                "jd_tt": root_jd,
+                "kind": crossing_kind,
+                "time_utc": time_to_utc_iso(self.ts.tt_jd(root_jd), calendar=calendar),
+                "moon_altitude_deg": float(crossing_alt),
+                "moon_azimuth_deg": float(crossing_az),
+                "moon_semidiameter_deg": float(crossing_radius),
+                "horizon_clearance_deg": float(crossing_clearance),
+            })
+
+        # Build complete above-horizon intervals over the search window, then
+        # clip them to the eclipse and to each geocentric phase interval.
+        above_intervals: list[tuple[float, float]] = []
+        is_above = bool(float(clearances[0]) >= 0.0)
+        interval_start = search_start_jd if is_above else None
+        for crossing in crossings:
+            crossing_jd = float(crossing["jd_tt"])
+            if crossing["kind"] == "moonset" and is_above:
+                above_intervals.append((float(interval_start), crossing_jd))
+                interval_start = None
+                is_above = False
+            elif crossing["kind"] == "moonrise" and not is_above:
+                interval_start = crossing_jd
+                is_above = True
+        if is_above and interval_start is not None:
+            above_intervals.append((float(interval_start), search_end_jd))
+
+        def intersect_phase(
+            start_jd: float | None,
+            end_jd: float | None,
+            start_contact: str,
+            end_contact: str,
+        ) -> list[dict[str, Any]]:
+            if start_jd is None or end_jd is None or end_jd <= start_jd:
+                return []
+            visible: list[dict[str, Any]] = []
+            for horizon_start, horizon_end in above_intervals:
+                clipped_start = max(start_jd, horizon_start)
+                clipped_end = min(end_jd, horizon_end)
+                if clipped_end <= clipped_start:
+                    continue
+                start_source = (
+                    start_contact
+                    if abs(clipped_start - start_jd) <= 0.1 / 86400.0
+                    else "moonrise"
+                )
+                end_source = (
+                    end_contact
+                    if abs(clipped_end - end_jd) <= 0.1 / 86400.0
+                    else "moonset"
+                )
+                visible.append({
+                    "start_utc": time_to_utc_iso(
+                        self.ts.tt_jd(clipped_start), calendar=calendar
+                    ),
+                    "end_utc": time_to_utc_iso(
+                        self.ts.tt_jd(clipped_end), calendar=calendar
+                    ),
+                    "duration_seconds": (clipped_end - clipped_start) * 86400.0,
+                    "start_cause": start_source,
+                    "end_cause": end_source,
+                })
+            return visible
+
+        penumbral_intervals = intersect_phase(
+            event_start_jd, event_end_jd, "P1", "P4"
+        )
+        partial_intervals = intersect_phase(
+            float(contacts["U1"].tt) if contacts.get("U1") is not None else None,
+            float(contacts["U4"].tt) if contacts.get("U4") is not None else None,
+            "U1", "U4",
+        )
+        totality_intervals = intersect_phase(
+            float(contacts["U2"].tt) if contacts.get("U2") is not None else None,
+            float(contacts["U3"].tt) if contacts.get("U3") is not None else None,
+            "U2", "U3",
+        )
+
+        def contact_details() -> dict[str, Any]:
+            details: dict[str, Any] = {}
+            for name, phase_time in contacts.items():
+                if phase_time is None:
+                    details[name] = None
+                    continue
+                alt, az, radius, clearance = evaluate(float(phase_time.tt))
+                horizon_value = horizon_altitude_deg + (
+                    horizon_profile.altitude_at(float(az)) if horizon_profile is not None else 0.0
+                )
+                details[name] = {
+                    "time_utc": time_to_utc_iso(phase_time, calendar=calendar),
+                    "moon_altitude_deg": float(alt),
+                    "moon_azimuth_deg": float(az),
+                    "moon_semidiameter_deg": float(radius),
+                    "horizon_altitude_deg": float(horizon_value),
+                    "horizon_clearance_deg": float(clearance),
+                    "visible": bool(float(clearance) >= 0.0),
+                }
+            return details
+
+        event_sample_mask = (sample_jds >= event_start_jd) & (sample_jds <= event_end_jd)
+        event_sample_jds = sample_jds[event_sample_mask]
+        event_altitudes = altitudes[event_sample_mask]
+        event_azimuths = azimuths[event_sample_mask]
+        event_semidiameters = semidiameters[event_sample_mask]
+        event_clearances = clearances[event_sample_mask]
+        if len(event_sample_jds):
+            min_index = int(np.argmin(event_altitudes))
+            max_index = int(np.argmax(event_altitudes))
+            altitude_extrema = {
+                "minimum_deg": float(event_altitudes[min_index]),
+                "minimum_time_utc": time_to_utc_iso(
+                    self.ts.tt_jd(float(event_sample_jds[min_index])), calendar=calendar
+                ),
+                "maximum_deg": float(event_altitudes[max_index]),
+                "maximum_time_utc": time_to_utc_iso(
+                    self.ts.tt_jd(float(event_sample_jds[max_index])), calendar=calendar
+                ),
+                "sampling_interval_seconds": sample_interval_seconds,
+            }
+        else:  # pragma: no cover - P1/P4 are inserted above
+            altitude_extrema = None
+
+        altitude_profile: list[dict[str, Any]] = []
+        if include_altitude_profile:
+            for jd_value, altitude_value, azimuth_value, radius_value, clearance_value in zip(
+                event_sample_jds, event_altitudes, event_azimuths,
+                event_semidiameters, event_clearances,
+            ):
+                altitude_profile.append({
+                    "time_utc": time_to_utc_iso(
+                        self.ts.tt_jd(float(jd_value)), calendar=calendar
+                    ),
+                    "moon_altitude_deg": float(altitude_value),
+                    "moon_azimuth_deg": float(azimuth_value),
+                    "moon_semidiameter_deg": float(radius_value),
+                    "horizon_clearance_deg": float(clearance_value),
+                    "visible": bool(float(clearance_value) >= 0.0),
+                })
+
+        visible_duration = sum(
+            float(item["duration_seconds"]) for item in penumbral_intervals
+        )
+        event_duration = (event_end_jd - event_start_jd) * 86400.0
+        if not penumbral_intervals:
+            visibility_status = "not_visible"
+        elif visible_duration >= event_duration - 0.2:
+            visibility_status = "visible_throughout"
+        else:
+            visibility_status = "partially_visible"
+
+        horizon_crossings = [
+            {key: value for key, value in item.items() if key != "jd_tt"}
+            for item in crossings
+        ]
+        moonrises = [item["time_utc"] for item in crossings if item["kind"] == "moonrise"]
+        moonsets = [item["time_utc"] for item in crossings if item["kind"] == "moonset"]
+        max_contact = contact_details().get("greatest")
+        first_visible = penumbral_intervals[0] if penumbral_intervals else None
+        last_visible = penumbral_intervals[-1] if penumbral_intervals else None
+        return {
+            "event_type": "lunar_eclipse_local_visibility",
+            "observer": {
+                "name": observer.name,
+                "country": observer.country,
+                "latitude_deg": observer.latitude,
+                "longitude_deg": observer.longitude,
+                "elevation_m": observer.elevation_m,
+            },
+            "visibility_status": visibility_status,
+            "visible_at_greatest": bool(max_contact and max_contact["visible"]),
+            "moonrise_utc": moonrises,
+            "moonset_utc": moonsets,
+            "horizon_crossings": horizon_crossings,
+            "local_event_start_utc": (
+                first_visible["start_utc"] if first_visible else None
+            ),
+            "local_event_end_utc": (
+                last_visible["end_utc"] if last_visible else None
+            ),
+            "observable_intervals": penumbral_intervals,
+            "phase_visibility": {
+                "penumbral": {
+                    "visible": bool(penumbral_intervals),
+                    "intervals": penumbral_intervals,
+                },
+                "partial": {
+                    "visible": bool(partial_intervals),
+                    "intervals": partial_intervals,
+                },
+                "totality": {
+                    "visible": bool(totality_intervals),
+                    "intervals": totality_intervals,
+                },
+            },
+            "contact_visibility": contact_details(),
+            "moon_altitude_extrema_during_eclipse": altitude_extrema,
+            "altitude_profile": altitude_profile,
+            "visibility_model": {
+                "limb_visibility": limb_visibility,
+                "moon_radius_km": moon_radius_km,
+                "horizon_altitude_deg": horizon_altitude_deg,
+                "horizon_profile": horizon_profile.name if horizon_profile else None,
+                "refraction_applied": use_refraction,
+                "pressure_mbar": (
+                    pressure_for_altaz if use_refraction else None
+                ),
+                "temperature_c": temperature_c if use_refraction else None,
+                "observer_elevation_m": observer.elevation_m,
+                "sample_interval_seconds": sample_interval_seconds,
+                "root_tolerance_seconds": 0.1,
+                "note": (
+                    "Moonrise/moonset are upper-limb horizon crossings by default. "
+                    "Atmospheric refraction is an approximate standard-atmosphere model; "
+                    "local weather, extinction, diffraction and terrain outside the "
+                    "supplied horizon profile are not modelled."
+                ),
+            },
+            "eclipse": event.to_dict(calendar=calendar),
+        }
+
     def lunar_eclipse_city_visibility(
         self, when: Any, catalog: CityCatalog, *, country: str | None = None,
         calendar: str = "historical", minimum_altitude_deg: float = -0.5,
+        visibility_window: str = "greatest", sample_interval_seconds: float = 300.0,
         shadow_enlargement: float = 1.0, shadow_model: str = "herald_sinnott",
         atmospheric_nel_height_km: float = 87.0,
         flattening_coefficient: float = 0.003353,
     ) -> list[dict[str, Any]]:
-        """Return cities where the Moon is above the horizon at greatest eclipse.
+        """Find catalogue cities where some or all of a lunar eclipse is visible.
 
-        Eclipse classification, magnitudes and contact instants are geocentric;
-        lunar altitude is topocentric. For each returned city, ``phase_visibility``
-        reports the Moon altitude at every geocentric contact and greatest eclipse.
-        These are visibility flags at geocentric instants, not locally solved
-        contact times or moonrise/moonset events.
+        ``visibility_window="greatest"`` preserves the original fast filter:
+        the Moon's geometric centre must exceed ``minimum_altitude_deg`` at
+        greatest eclipse. ``visibility_window="any"`` samples the complete
+        P1--P4 interval and includes a city when the Moon's centre exceeds that
+        threshold at any sample, even when it is below the horizon at greatest
+        eclipse. The latter mode is a catalogue-screening operation; call
+        :meth:`lunar_eclipse_local_visibility` for refined moonrise/moonset,
+        refraction, skyline masks and exact local phase intervals.
         """
         if not -90.0 <= minimum_altitude_deg <= 90.0:
             raise ValueError("minimum_altitude_deg must be in [-90, 90]")
+        if visibility_window not in {"greatest", "any"}:
+            raise ValueError("visibility_window must be 'greatest' or 'any'")
+        if isinstance(sample_interval_seconds, bool):
+            raise ValueError("sample_interval_seconds must be between 1 and 3600")
+        sample_interval_seconds = float(sample_interval_seconds)
+        if not math.isfinite(sample_interval_seconds) or not 1.0 <= sample_interval_seconds <= 3600.0:
+            raise ValueError("sample_interval_seconds must be between 1 and 3600")
         event = self.calculate_lunar_eclipse(
             when, calendar=calendar, shadow_enlargement=shadow_enlargement,
             shadow_model=shadow_model,
@@ -2251,18 +2707,70 @@ class EclipseEngine:
             distances = np.linalg.norm(moon_vectors, axis=1)
             directions = moon_vectors / distances[:, np.newaxis]
             phase_altitudes[phase_name] = np.degrees(
-                np.arcsin(
-                    np.clip(np.sum(directions * selected_up, axis=1), -1.0, 1.0)
-                )
+                np.arcsin(np.clip(np.sum(directions * selected_up, axis=1), -1.0, 1.0))
             )
         maximum_altitude = phase_altitudes.get("greatest")
         if maximum_altitude is None:
             return []
+
+        first_visible_jd = np.full(len(indices), np.nan, dtype=np.float64)
+        last_visible_jd = np.full(len(indices), np.nan, dtype=np.float64)
+        highest_altitude = maximum_altitude.copy()
+        if visibility_window == "greatest":
+            visible_at_maximum = maximum_altitude > minimum_altitude_deg
+            visible_any = visible_at_maximum.copy()
+            resolution_used: float | None = None
+        else:
+            p1 = event.contacts.p1
+            p4 = event.contacts.p4
+            if p1 is None or p4 is None:
+                return []
+            start_jd, end_jd = float(p1.tt), float(p4.tt)
+            if end_jd <= start_jd:
+                raise RuntimeError("lunar eclipse P4 must be later than P1")
+            duration_seconds = (end_jd - start_jd) * 86400.0
+            sample_count = max(3, int(math.ceil(duration_seconds / sample_interval_seconds)) + 1)
+            sample_jds = np.linspace(start_jd, end_jd, sample_count)
+            # Ensure contacts and greatest eclipse are evaluated exactly.
+            contact_jds = [
+                float(value.tt) for value in event.contacts.as_dict().values()
+                if value is not None
+            ]
+            sample_jds = np.unique(np.concatenate((
+                sample_jds, np.asarray(contact_jds, dtype=np.float64)
+            )))
+            all_at = self.earth.at(self.ts.tt_jd(sample_jds))
+            moon_positions = np.asarray(
+                all_at.observe(self.moon).apparent().frame_xyz(itrs).km,
+                dtype=np.float64,
+            )
+            if moon_positions.ndim == 1:
+                moon_positions = moon_positions.reshape(3, 1)
+            if moon_positions.shape[0] == 3:
+                moon_positions = moon_positions.T
+            elif moon_positions.shape[1] != 3:
+                raise RuntimeError("Skyfield returned an unexpected ITRS Moon position shape")
+            visible_any = np.zeros(len(indices), dtype=bool)
+            for jd_value, moon_position in zip(sample_jds, moon_positions):
+                moon_vectors = moon_position[np.newaxis, :] - selected_ecef
+                distances = np.linalg.norm(moon_vectors, axis=1)
+                directions = moon_vectors / distances[:, np.newaxis]
+                altitude_values = np.degrees(np.arcsin(np.clip(
+                    np.sum(directions * selected_up, axis=1), -1.0, 1.0
+                )))
+                highest_altitude = np.maximum(highest_altitude, altitude_values)
+                visible_now = altitude_values > minimum_altitude_deg
+                new_visibility = visible_now & ~visible_any
+                first_visible_jd[new_visibility] = float(jd_value)
+                last_visible_jd[visible_now] = float(jd_value)
+                visible_any |= visible_now
+            visible_at_maximum = maximum_altitude > minimum_altitude_deg
+            resolution_used = sample_interval_seconds
+
         event_payload = event.to_dict(calendar=calendar)
         output: list[dict[str, Any]] = []
         for local_index, global_index in enumerate(indices):
-            altitude_deg = float(maximum_altitude[local_index])
-            if altitude_deg <= minimum_altitude_deg:
+            if not visible_any[local_index]:
                 continue
             phase_visibility = {
                 name: {
@@ -2274,20 +2782,48 @@ class EclipseEngine:
             visible_phases = [
                 name for name, values in phase_visibility.items() if values["visible"]
             ]
+            first_jd = float(first_visible_jd[local_index])
+            last_jd = float(last_visible_jd[local_index])
             output.append({
                 "city": catalog.cities[int(global_index)],
                 "maximum": event.maximum,
-                "moon_altitude_deg": altitude_deg,
+                "moon_altitude_deg": float(maximum_altitude[local_index]),
+                "highest_moon_altitude_deg_during_eclipse": float(
+                    highest_altitude[local_index]
+                ),
                 "penumbral_magnitude": event.penumbral_magnitude,
                 "umbral_magnitude": event.umbral_magnitude,
                 "approximate_umbral_magnitude": event.umbral_magnitude,
                 "eclipse_type": event.eclipse_type,
-                "visible_at_maximum": True,
+                "visible_at_maximum": bool(visible_at_maximum[local_index]),
+                "visible_during_eclipse": True,
+                "visibility_window": visibility_window,
+                "first_visible_sample_utc": (
+                    time_to_utc_iso(self.ts.tt_jd(first_jd), calendar=calendar)
+                    if math.isfinite(first_jd) else None
+                ),
+                "last_visible_sample_utc": (
+                    time_to_utc_iso(self.ts.tt_jd(last_jd), calendar=calendar)
+                    if math.isfinite(last_jd) else None
+                ),
+                "visibility_sample_interval_seconds": resolution_used,
+                "visibility_threshold": {
+                    "moon_center_altitude_deg": minimum_altitude_deg,
+                    "refraction_applied": False,
+                    "note": (
+                        "Geometric centre-altitude screening only; use "
+                        "lunar_eclipse_local_visibility() for refraction, lunar-limb "
+                        "rise/set and refined phase-overlap intervals."
+                    ),
+                },
                 "phase_visibility": phase_visibility,
                 "visible_contact_phases": visible_phases,
                 "event": event_payload,
             })
-        output.sort(key=lambda row: row["moon_altitude_deg"], reverse=True)
+        output.sort(
+            key=lambda row: row["highest_moon_altitude_deg_during_eclipse"],
+            reverse=True,
+        )
         return output
 
     def format_report(self, result: LocalEclipseResult, *, language: str = "en") -> str:

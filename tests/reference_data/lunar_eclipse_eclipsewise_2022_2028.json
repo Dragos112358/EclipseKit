@@ -237,6 +237,8 @@
       "penumbral_magnitude": 0.0032,
       "umbral_magnitude": -1.0662,
       "gamma_signed": -1.57589,
+      "moon_radius_km": 1737.9791264853177,
+      "moon_radius_note": "Reference-only radius inferred from the published rounded lunar semidiameter and geocentric distance; not a global physical-radius default.",
       "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2027Jul18Nprime.html",
       "edge_case": "Extremely shallow penumbral grazing event; NASA's catalog labels the N-class event with the Saros-ending qualifier 'e'."
     },

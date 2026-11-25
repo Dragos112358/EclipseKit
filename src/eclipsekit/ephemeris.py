@@ -15,7 +15,7 @@ from .earth_orientation import EarthOrientationConfig, describe_earth_orientatio
 _JPL_PLANETS_URL = (
     "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/"
 )
-_KNOWN_JPL_KERNELS = {"de432s.bsp", "de440s.bsp", "de440.bsp", "de441.bsp"}
+_KNOWN_JPL_KERNELS = {"de430.bsp", "de432s.bsp", "de440s.bsp", "de440.bsp", "de441.bsp"}
 
 
 def default_ephemeris_cache_dir() -> Path:
@@ -63,13 +63,33 @@ class EphemerisContext:
                 self.ephemeris = load_file(str(local_file))
                 self.kernel_source = raw
             else:
+                # A path-like value is an explicit local-file request, not a kernel
+                # registry name.  Do not pass a missing Windows path to Loader(),
+                # which otherwise constructs a misleading remote URL and returns 404.
+                path_like = (
+                    candidate.is_absolute()
+                    or len(candidate.parts) > 1
+                    or "/" in raw
+                    or "\\" in raw
+                )
+                if path_like and candidate.suffix.lower() != ".bsp":
+                    raise ValueError(
+                        "ephemeris must be a local .bsp file, an HTTP(S) URL, or a JPL "
+                        "kernel name such as 'de430'"
+                    )
+                if path_like and raw.lower() not in _KNOWN_JPL_KERNELS:
+                    raise FileNotFoundError(
+                        f"Local ephemeris kernel not found: {candidate}. "
+                        "Place the BSP file at that path, or pass a supported JPL "
+                        "kernel name such as 'de430' to download it into the cache."
+                    )
                 name = raw.lower()
                 if not name.endswith(".bsp") and "/" not in name and "\\" not in name:
                     name += ".bsp"
                 if not name.endswith(".bsp"):
                     raise ValueError(
                         "ephemeris must be a local .bsp file, an HTTP(S) URL, or a JPL kernel name "
-                        "such as 'de432s', 'de440s', 'de440', or 'de441'"
+                        "such as 'de430', 'de432s', 'de440s', 'de440', or 'de441'"
                     )
                 if name in _KNOWN_JPL_KERNELS:
                     # Use the official NAIF SPK directory directly so the common DE
