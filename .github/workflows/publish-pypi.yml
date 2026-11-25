@@ -30,7 +30,9 @@ jobs:
         run: python -m compileall -q src tests examples scripts
 
       - name: Test suite
-        run: python -m pytest -q --basetemp="$PWD/.pytest-tmp/release"
+        run: |
+          mkdir -p .pytest-tmp
+          python -m pytest -q --basetemp="$PWD/.pytest-tmp/release"
 
       - name: Dependency vulnerability audit
         run: python -m pip_audit --skip-editable
