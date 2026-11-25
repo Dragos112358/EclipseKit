@@ -1,0 +1,320 @@
+{
+  "schema_version": 1,
+  "title": "EclipseKit lunar eclipse external reference matrix",
+  "reference_author": "Fred Espenak",
+  "reference_site": "EclipseWise",
+  "reference_method": "Herald/Sinnott",
+  "reference_ephemeris": "JPL DE430",
+  "reference_shadow_enlargement": 1.0,
+  "reference_time_scale": "UT1",
+  "independent_catalog": "NASA GSFC Five Millennium Catalog of Lunar Eclipses",
+  "independent_catalog_method": "Danjon shadow enlargement; classification only",
+  "license_note": "Eclipse predictions by Fred Espenak, www.EclipseWise.com; reproduced with source links and attribution.",
+  "cases": [
+    {
+      "date": "2022-05-16",
+      "eclipse_type": "total",
+      "nasa_catalog_type": "T",
+      "greatest_ut1": "2022-05-16T04:11:31.2",
+      "contacts_ut1": {
+        "P1": "2022-05-16T01:31:43.9",
+        "U1": "2022-05-16T02:27:30.8",
+        "U2": "2022-05-16T03:28:39.5",
+        "greatest": "2022-05-16T04:11:31.2",
+        "U3": "2022-05-16T04:54:11.5",
+        "U4": "2022-05-16T05:55:27.4",
+        "P4": "2022-05-16T06:51:11.4"
+      },
+      "penumbral_magnitude": 2.37433,
+      "umbral_magnitude": 1.41545,
+      "gamma_signed": -0.25323,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2022May16Tprime.html"
+    },
+    {
+      "date": "2022-11-08",
+      "eclipse_type": "total",
+      "nasa_catalog_type": "T",
+      "greatest_ut1": "2022-11-08T10:59:11.3",
+      "contacts_ut1": {
+        "P1": "2022-11-08T08:01:51.7",
+        "U1": "2022-11-08T09:08:48.6",
+        "U2": "2022-11-08T10:16:12.2",
+        "greatest": "2022-11-08T10:59:11.3",
+        "U3": "2022-11-08T11:41:51.7",
+        "U4": "2022-11-08T12:49:23.5",
+        "P4": "2022-11-08T13:56:32.2"
+      },
+      "penumbral_magnitude": 2.41615,
+      "umbral_magnitude": 1.36069,
+      "gamma_signed": 0.25703,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2022Nov08Tprime.html"
+    },
+    {
+      "date": "2023-05-05",
+      "eclipse_type": "penumbral",
+      "nasa_catalog_type": "N",
+      "greatest_ut1": "2023-05-05T17:22:53.5",
+      "contacts_ut1": {
+        "P1": "2023-05-05T15:13:38.8",
+        "U1": null,
+        "U2": null,
+        "greatest": "2023-05-05T17:22:53.5",
+        "U3": null,
+        "U4": null,
+        "P4": "2023-05-05T19:31:54.4"
+      },
+      "penumbral_magnitude": 0.96551,
+      "umbral_magnitude": -0.04378,
+      "gamma_signed": -1.03495,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2023May05Nprime.html"
+    },
+    {
+      "date": "2023-10-28",
+      "eclipse_type": "partial",
+      "nasa_catalog_type": "P",
+      "greatest_ut1": "2023-10-28T20:14:05.9",
+      "contacts_ut1": {
+        "P1": "2023-10-28T18:01:16.6",
+        "U1": "2023-10-28T19:34:41.4",
+        "U2": null,
+        "greatest": "2023-10-28T20:14:05.9",
+        "U3": null,
+        "U4": "2023-10-28T20:52:50.3",
+        "P4": "2023-10-28T22:26:33.0"
+      },
+      "penumbral_magnitude": 1.11997,
+      "umbral_magnitude": 0.12393,
+      "gamma_signed": 0.94716,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2023Oct28Pprime.html"
+    },
+    {
+      "date": "2024-03-25",
+      "eclipse_type": "penumbral",
+      "nasa_catalog_type": "N",
+      "greatest_ut1": "2024-03-25T07:12:48.8",
+      "contacts_ut1": {
+        "P1": "2024-03-25T04:53:07.4",
+        "U1": null,
+        "U2": null,
+        "greatest": "2024-03-25T07:12:48.8",
+        "U3": null,
+        "U4": null,
+        "P4": "2024-03-25T09:32:58.9"
+      },
+      "penumbral_magnitude": 0.95767,
+      "umbral_magnitude": -0.13044,
+      "gamma_signed": 1.06098,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2024Mar25Nprime.html"
+    },
+    {
+      "date": "2024-09-18",
+      "eclipse_type": "partial",
+      "nasa_catalog_type": "P",
+      "greatest_ut1": "2024-09-18T02:44:14.1",
+      "contacts_ut1": {
+        "P1": "2024-09-18T00:40:57.9",
+        "U1": "2024-09-18T02:12:42.4",
+        "U2": null,
+        "greatest": "2024-09-18T02:44:14.1",
+        "U3": null,
+        "U4": "2024-09-18T03:16:21.9",
+        "P4": "2024-09-18T04:47:53.5"
+      },
+      "penumbral_magnitude": 1.03922,
+      "umbral_magnitude": 0.08685,
+      "gamma_signed": -0.9792,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2024Sep18Pprime.html"
+    },
+    {
+      "date": "2025-03-14",
+      "eclipse_type": "total",
+      "nasa_catalog_type": "T",
+      "greatest_ut1": "2025-03-14T06:58:44.5",
+      "contacts_ut1": {
+        "P1": "2025-03-14T03:57:09.4",
+        "U1": "2025-03-14T05:09:22.6",
+        "U2": "2025-03-14T06:25:57.5",
+        "greatest": "2025-03-14T06:58:44.5",
+        "U3": "2025-03-14T07:32:01.5",
+        "U4": "2025-03-14T08:48:18.5",
+        "P4": "2025-03-14T10:00:31.9"
+      },
+      "penumbral_magnitude": 2.26146,
+      "umbral_magnitude": 1.18038,
+      "gamma_signed": 0.34846,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2025Mar14Tprime.html"
+    },
+    {
+      "date": "2025-09-07",
+      "eclipse_type": "total",
+      "nasa_catalog_type": "T",
+      "greatest_ut1": "2025-09-07T18:11:46.1",
+      "contacts_ut1": {
+        "P1": "2025-09-07T15:28:06.0",
+        "U1": "2025-09-07T16:26:51.0",
+        "U2": "2025-09-07T17:30:36.6",
+        "greatest": "2025-09-07T18:11:46.1",
+        "U3": "2025-09-07T18:53:18.0",
+        "U4": "2025-09-07T19:56:53.3",
+        "P4": "2025-09-07T20:55:27.9"
+      },
+      "penumbral_magnitude": 2.34591,
+      "umbral_magnitude": 1.36379,
+      "gamma_signed": -0.27521,
+      "source_url": "https://www.eclipsewise.com/lunar/LEprime/2001-2100/LE2025Sep07Tprime.html"
+    },
+    {
+      "date": "2026-03-03",
+      "eclipse_type": "total",
+      "nasa_catalog_type": "T",
+      "greatest_ut1": "2026-03-03T11:33:40.0",
+      "contacts_ut1": {
+        "P1": "2026-03-03T08:43:57.6",
+        "U1": "2026-03-03T09:49:36.6",
+        "U2": "2026-03-03T11:03:54.4",
+        "greatest": "2026-03-03T11:33:40.0",
+        "U3": "2026-03-03T12:02:52.6",
+        "U4": "2026-03-03T13:17:25.9",
+        "P4": "2026-03-03T14:23:18.6"
+      },
+      "penumbral_magnitude": 2.1858,
+      "umbral_magnitude": 1.15263,
+      "gamma_signed": -0.37651,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2026Mar03Tprime.html"
+    },
+    {
+      "date": "2026-08-28",
+      "eclipse_type": "partial",
+      "nasa_catalog_type": "P",
+      "greatest_ut1": "2026-08-28T04:12:52.0",
+      "contacts_ut1": {
+        "P1": "2026-08-28T01:23:29.0",
+        "U1": "2026-08-28T02:33:21.4",
+        "U2": null,
+        "greatest": "2026-08-28T04:12:52.0",
+        "U3": null,
+        "U4": "2026-08-28T05:52:09.3",
+        "P4": "2026-08-28T07:01:59.8"
+      },
+      "penumbral_magnitude": 1.96645,
+      "umbral_magnitude": 0.93187,
+      "gamma_signed": 0.49644,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2026Aug28Pprime.html"
+    },
+    {
+      "date": "2027-02-20",
+      "eclipse_type": "penumbral",
+      "nasa_catalog_type": "N",
+      "greatest_ut1": "2027-02-20T23:12:52.7",
+      "contacts_ut1": {
+        "P1": "2027-02-20T21:11:49.4",
+        "U1": null,
+        "U2": null,
+        "greatest": "2027-02-20T23:12:52.7",
+        "U3": null,
+        "U4": null,
+        "P4": "2027-02-21T01:13:29.9"
+      },
+      "penumbral_magnitude": 0.92861,
+      "umbral_magnitude": -0.05491,
+      "gamma_signed": -1.04803,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2027Feb20Nprime.html"
+    },
+    {
+      "date": "2027-07-18",
+      "eclipse_type": "penumbral",
+      "nasa_catalog_type": "Ne",
+      "greatest_ut1": "2027-07-18T16:02:57.8",
+      "contacts_ut1": {
+        "P1": "2027-07-18T15:54:17.8",
+        "U1": null,
+        "U2": null,
+        "greatest": "2027-07-18T16:02:57.8",
+        "U3": null,
+        "U4": null,
+        "P4": "2027-07-18T16:11:57.0"
+      },
+      "penumbral_magnitude": 0.0032,
+      "umbral_magnitude": -1.0662,
+      "gamma_signed": -1.57589,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2027Jul18Nprime.html",
+      "edge_case": "Extremely shallow penumbral grazing event; NASA's catalog labels the N-class event with the Saros-ending qualifier 'e'."
+    },
+    {
+      "date": "2027-08-17",
+      "eclipse_type": "penumbral",
+      "nasa_catalog_type": "N",
+      "greatest_ut1": "2027-08-17T07:13:45.1",
+      "contacts_ut1": {
+        "P1": "2027-08-17T05:23:52.3",
+        "U1": null,
+        "U2": null,
+        "greatest": "2027-08-17T07:13:45.1",
+        "U3": null,
+        "U4": null,
+        "P4": "2027-08-17T09:03:13.7"
+      },
+      "penumbral_magnitude": 0.54758,
+      "umbral_magnitude": -0.52344,
+      "gamma_signed": 1.27974,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2027Aug17Nprime.html"
+    },
+    {
+      "date": "2028-01-12",
+      "eclipse_type": "partial",
+      "nasa_catalog_type": "P",
+      "greatest_ut1": "2028-01-12T04:13:00.5",
+      "contacts_ut1": {
+        "P1": "2028-01-12T02:07:24.2",
+        "U1": "2028-01-12T03:44:46.1",
+        "U2": null,
+        "greatest": "2028-01-12T04:13:00.5",
+        "U3": null,
+        "U4": "2028-01-12T04:41:38.6",
+        "P4": "2028-01-12T06:18:50.3"
+      },
+      "penumbral_magnitude": 1.04848,
+      "umbral_magnitude": 0.06787,
+      "gamma_signed": 0.98177,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2028Jan12Pprime.html"
+    },
+    {
+      "date": "2028-07-06",
+      "eclipse_type": "partial",
+      "nasa_catalog_type": "P",
+      "greatest_ut1": "2028-07-06T18:19:44.0",
+      "contacts_ut1": {
+        "P1": "2028-07-06T15:44:03.3",
+        "U1": "2028-07-06T17:08:40.0",
+        "U2": null,
+        "greatest": "2028-07-06T18:19:44.0",
+        "U3": null,
+        "U4": "2028-07-06T19:30:52.7",
+        "P4": "2028-07-06T20:55:32.6"
+      },
+      "penumbral_magnitude": 1.42819,
+      "umbral_magnitude": 0.39083,
+      "gamma_signed": -0.7904,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2028Jul06Pprime.html"
+    },
+    {
+      "date": "2028-12-31",
+      "eclipse_type": "total",
+      "nasa_catalog_type": "T",
+      "greatest_ut1": "2028-12-31T16:52:01.7",
+      "contacts_ut1": {
+        "P1": "2028-12-31T14:03:27.2",
+        "U1": "2028-12-31T15:07:17.1",
+        "U2": "2028-12-31T16:16:06.8",
+        "greatest": "2028-12-31T16:52:01.7",
+        "U3": "2028-12-31T17:28:08.3",
+        "U4": "2028-12-31T18:36:53.8",
+        "P4": "2028-12-31T19:40:33.5"
+      },
+      "penumbral_magnitude": 2.27579,
+      "umbral_magnitude": 1.24785,
+      "gamma_signed": 0.32583,
+      "source_url": "https://eclipsewise.com/lunar/LEprime/2001-2100/LE2028Dec31Tprime.html"
+    }
+  ]
+}

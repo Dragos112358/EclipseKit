@@ -184,7 +184,8 @@ def test_lunar_eclipse_city_visibility_filters_below_horizon_locations(monkeypat
 
     engine = bare_engine()
     engine.earth = FakeObserver()
-    engine.time = lambda when: FakeTime(2.0)
+    #engine.time = lambda when: FakeTime(2.0)
+    engine.time = lambda when, *, calendar="historical": FakeTime(2.0)
     engine.sun_radius_km = 695700.0
     # Earth-fixed positions from the geocenter: Sun and Moon are opposite.
     vectors = {engine.sun: np.array([150_000_000.0, 0.0, 0.0]),

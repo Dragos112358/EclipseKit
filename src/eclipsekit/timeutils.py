@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import math
+import re
 from typing import Any
 
 
@@ -93,6 +94,48 @@ def delta_t_seconds(year: float, month: int = 6) -> float:
     return -20.0 + 32.0*u**2
 
 
+def _calendar_gregorian_flag(
+    year: int, month: int, day: int, calendar: str = "historical"
+) -> bool:
+    """Resolve a calendar name to the Gregorian/Julian arithmetic convention.
+
+    ``historical`` follows the civil reform: Julian through 1582-10-04, then
+    Gregorian from 1582-10-15. The ten skipped civil dates are rejected.
+    ``julian`` and ``gregorian`` select proleptic calendars for every year.
+    """
+    name = str(calendar).casefold()
+    if name == "gregorian":
+        return True
+    if name == "julian":
+        return False
+    if name != "historical":
+        raise ValueError("calendar must be 'historical', 'julian', or 'gregorian'")
+    civil = (int(year), int(month), int(day))
+    if (1582, 10, 5) <= civil <= (1582, 10, 14):
+        raise ValueError(
+            "1582-10-05 through 1582-10-14 do not exist in the historical "
+            "Julian-to-Gregorian calendar transition; choose calendar='julian' "
+            "or calendar='gregorian' for a proleptic date"
+        )
+    return civil >= (1582, 10, 15)
+
+
+def _calendar_iso_fields(value: str) -> tuple[int, int, int, int, int, float] | None:
+    """Parse a calendar date/time without Python datetime's Gregorian assumption."""
+    match = re.fullmatch(
+        r"([+-]?\d{1,6})-(\d{2})-(\d{2})"
+        r"(?:[Tt ](\d{2}):(\d{2})(?::(\d{2}(?:\.\d*)?))?)?",
+        value.strip(),
+    )
+    if match is None:
+        return None
+    year, month, day = (int(match.group(i)) for i in (1, 2, 3))
+    hour = int(match.group(4) or 12)
+    minute = int(match.group(5) or 0)
+    second = float(match.group(6) or 0.0)
+    return year, month, day, hour, minute, second
+
+
 def julian_day_from_calendar(
     year: int, month: int, day: int, hour: int = 0, minute: int = 0,
     second: float = 0.0, *, gregorian: bool | None = None,
@@ -107,7 +150,12 @@ def julian_day_from_calendar(
     if hour not in range(24) or minute not in range(60) or not 0 <= second < 61:
         raise ValueError("invalid time of day")
     if gregorian is None:
-        gregorian = (year, month, day) >= (1582, 10, 15)
+        gregorian = _calendar_gregorian_flag(year, month, day, "historical")
+    days_in_month = (31, 29 if (year % 4 == 0 and not gregorian) or
+                     (gregorian and (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)))
+                     else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    if not 1 <= day <= days_in_month[month - 1]:
+        raise ValueError(f"day must be valid for {year:04d}-{month:02d}")
     y, m = int(year), int(month)
     if m <= 2:
         y -= 1
@@ -125,12 +173,19 @@ def julian_day_from_calendar(
     return jd0 + (hour + minute / 60.0 + second / 3600.0) / 24.0
 
 
-def calendar_from_julian_day(jd: float) -> tuple[int, int, int, int, int, float]:
-    """Inverse of the mixed Julian/Gregorian conversion, returning UTC-like fields."""
+def calendar_from_julian_day(
+    jd: float, *, gregorian: bool | None = None,
+) -> tuple[int, int, int, int, int, float]:
+    """Convert a Julian Day to calendar fields.
+
+    The default uses the historical Julian/Gregorian cutover. Set
+    ``gregorian=True`` or ``False`` for a proleptic calendar.
+    """
     jd_shift = jd + 0.5
     z = math.floor(jd_shift)
     f = jd_shift - z
-    if z < 2299161:
+    use_gregorian = (z >= 2299161) if gregorian is None else bool(gregorian)
+    if not use_gregorian:
         a = z
     else:
         alpha = math.floor((z - 1867216.25) / 36524.25)
@@ -151,22 +206,43 @@ def calendar_from_julian_day(jd: float) -> tuple[int, int, int, int, int, float]
     return int(year), int(month), int(day), hour, minute, second
 
 
-def time_from_calendar(ts: Any, year: int, month: int, day: int,
-                       hour: int = 0, minute: int = 0, second: float = 0.0) -> Any:
-    """Create a Skyfield Time; use Skyfield/IERS for 1900–2100 and the legacy Delta-T model outside."""
-    if 1900 <= year <= 2100:
+def time_from_calendar(
+    ts: Any, year: int, month: int, day: int, hour: int = 0,
+    minute: int = 0, second: float = 0.0, *, calendar: str = "historical",
+) -> Any:
+    """Create a Skyfield Time from a civil calendar date.
+
+    ``historical`` uses Julian dates up to 1582-10-04 and Gregorian dates
+    from 1582-10-15. ``julian`` and ``gregorian`` request proleptic calendars.
+    Modern Gregorian input is passed through Skyfield's UTC conversion; other
+    dates are converted through JD and the project's documented Delta-T model.
+    A modern Julian date is first converted to its equivalent Gregorian UTC date.
+    """
+    is_gregorian = _calendar_gregorian_flag(year, month, day, calendar)
+    jd_ut = julian_day_from_calendar(
+        year, month, day, hour, minute, second, gregorian=is_gregorian
+    )
+    if is_gregorian and 1900 <= year <= 2100:
         return ts.utc(year, month, day, hour, minute, second)
-    jd_ut = julian_day_from_calendar(year, month, day, hour, minute, second)
+    if not is_gregorian and 1900 <= year <= 2100:
+        gy, gm, gd, gh, gmin, gs = calendar_from_julian_day(
+            jd_ut, gregorian=True
+        )
+        if 1900 <= gy <= 2100:
+            return ts.utc(gy, gm, gd, gh, gmin, gs)
     jd_tt = jd_ut + delta_t_seconds(year, month) / 86400.0
     return ts.tt_jd(jd_tt)
 
 
-def coerce_time(ts: Any, value: Any) -> Any:
-    """Accept a Skyfield Time, JD(TT) float, datetime, date, or ISO date/time string.
+def coerce_time(ts: Any, value: Any, *, calendar: str = "historical") -> Any:
+    """Accept a Skyfield Time, JD(TT), datetime, date, or ISO date/time string.
 
-    A date-only string is interpreted as 12:00 UTC so a +/-12-hour search covers
-    that civil date. A naive datetime is interpreted as UTC.
+    Naive ISO date/time strings and :class:`datetime.date` values are interpreted
+    using ``calendar``. Python ``datetime`` objects and ISO strings with ``Z`` or
+    a numeric UTC offset represent absolute instants. A date-only value is
+    interpreted at 12:00 so a search window can cover the civil date.
     """
+    _calendar_gregorian_flag(2000, 1, 1, calendar)
     if hasattr(value, "tt") and hasattr(value, "utc"):
         return value
     if isinstance(value, (int, float)):
@@ -175,42 +251,113 @@ def coerce_time(ts: Any, value: Any) -> Any:
         dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
         return ts.from_datetime(dt.astimezone(timezone.utc))
     if isinstance(value, date):
-        return time_from_calendar(ts, value.year, value.month, value.day, 12)
+        return time_from_calendar(ts, value.year, value.month, value.day, 12, calendar=calendar)
     if isinstance(value, str):
         s = value.strip()
+        fields = _calendar_iso_fields(s)
+        # A naive ISO date/time is a civil-calendar value and must respect the
+        # selected Julian/Gregorian convention. Strings with an explicit Z or
+        # numeric UTC offset represent absolute instants and are parsed below.
+        has_timezone = s.endswith(("Z", "z")) or bool(
+            re.search(r"[Tt ]\d{2}:\d{2}(?::\d{2}(?:\.\d*)?)?[+-]\d{2}:?\d{2}$", s)
+        )
+        if fields is not None and not has_timezone:
+            return time_from_calendar(ts, *fields, calendar=calendar)
         try:
-            if len(s) == 10:
-                y, m, d = map(int, s.split("-"))
-                return time_from_calendar(ts, y, m, d, 12)
-            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00").replace("z", "+00:00"))
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             return ts.from_datetime(dt.astimezone(timezone.utc))
         except ValueError as exc:
-            raise ValueError(f"Unsupported date/time {value!r}; use YYYY-MM-DD or ISO-8601") from exc
+            raise ValueError(
+                f"Unsupported date/time {value!r}; use YYYY-MM-DD or ISO-8601"
+            ) from exc
     raise TypeError("time must be a Skyfield Time, JD(TT), date, datetime, or ISO-8601 string")
 
 
-def time_to_utc_iso(t: Any) -> str:
-    """Format a Skyfield Time as UTC ISO-8601, preserving the custom Delta-T convention for ancient epochs."""
+def time_to_utc_iso(t: Any, *, calendar: str = "historical") -> str:
+    """Format a Skyfield Time as an ISO timestamp in the requested civil calendar.
+
+    The absolute instant is unchanged. ``historical`` observes the 1582 cutover;
+    ``julian`` and ``gregorian`` choose proleptic calendars for display.
+    """
+    _calendar_gregorian_flag(2000, 1, 1, calendar)
     try:
         utc = t.utc
-        year = int(utc[0])
-        month = int(utc[1])
+        year, month = int(utc[0]), int(utc[1])
     except Exception:
         year, month, *_ = calendar_from_julian_day(float(t.tt))
-    if 1900 <= year <= 2100:
+
+    # Keep Skyfield's EOP-aware UTC formatter for ordinary modern Gregorian dates.
+    if calendar in {"historical", "gregorian"} and 1900 <= year <= 2100:
         try:
             value = t.utc_iso(delimiter="T", places=3)
             return value if value.endswith("Z") else value + "Z"
         except Exception:
             pass
-    dt = delta_t_seconds(year, month)
-    y, m, d, hh, mm, ss = calendar_from_julian_day(float(t.tt) - dt / 86400.0)
+
+    if calendar == "julian" and 1900 <= year <= 2100:
+        # Skyfield's scalar UTC tuple is Gregorian. Convert that exact UTC civil
+        # instant to JD, then express the same instant in the proleptic Julian
+        # calendar; do not approximate UTC by subtracting a polynomial Delta-T.
+        try:
+            utc = t.utc
+            jd_ut = julian_day_from_calendar(
+                int(utc[0]), int(utc[1]), int(utc[2]),
+                int(utc[3]), int(utc[4]), float(utc[5]), gregorian=True,
+            )
+        except Exception:
+            dt = delta_t_seconds(year, month)
+            jd_ut = float(t.tt) - dt / 86400.0
+    else:
+        dt = delta_t_seconds(year, month)
+        jd_ut = float(t.tt) - dt / 86400.0
+    # Quantize before calendar decomposition so a binary-float value just below
+    # a minute boundary cannot be rendered as an invalid ``:60`` second.
+    jd_ut = round(jd_ut * 86_400_000.0) / 86_400_000.0
+    gregorian = None if calendar == "historical" else calendar == "gregorian"
+    y, m, d, hh, mm, ss = calendar_from_julian_day(jd_ut, gregorian=gregorian)
     sign_year = f"-{abs(y):04d}" if y < 0 else f"{y:04d}"
-    whole = int(ss)
-    ms = int(round((ss - whole) * 1000))
-    if ms == 1000:
-        whole += 1
-        ms = 0
-    return f"{sign_year}-{m:02d}-{d:02d}T{hh:02d}:{mm:02d}:{whole:02d}.{ms:03d}Z"
+    milliseconds = int(round((ss - int(ss)) * 1000.0))
+    whole_seconds = int(ss)
+    if milliseconds >= 1000:
+        # Calendar decomposition can return 59.99999 because a JD cannot
+        # represent every millisecond exactly. Move just past the boundary and
+        # decompose again so we emit 07:00:00.000, never 06:59:60.000.
+        y, m, d, hh, mm, ss = calendar_from_julian_day(
+            jd_ut + 0.0005 / 86400.0, gregorian=gregorian
+        )
+        whole_seconds = int(ss)
+        milliseconds = int(round((ss - whole_seconds) * 1000.0))
+    return (
+        f"{sign_year}-{m:02d}-{d:02d}T{hh:02d}:{mm:02d}:"
+        f"{whole_seconds:02d}.{milliseconds:03d}Z"
+    )
+
+
+def time_to_ut1_iso(t: Any, *, calendar: str = "historical") -> str:
+    """Format a Skyfield Time's UT1 instant in an explicit civil calendar.
+
+    Unlike :func:`time_to_utc_iso`, this labels the Earth's rotation time scale
+    itself.  The returned suffix is ``UT1`` (not ``Z``), because UT1 is not UTC.
+    Its accuracy is limited by the active Skyfield/IERS or fixed-Delta-T source.
+    """
+    _calendar_gregorian_flag(2000, 1, 1, calendar)
+    jd_ut1 = float(t.ut1)
+    gregorian = None if calendar == "historical" else calendar == "gregorian"
+    year, month, day, hour, minute, second = calendar_from_julian_day(
+        jd_ut1, gregorian=gregorian
+    )
+    milliseconds = int(round((second - int(second)) * 1000.0))
+    whole_seconds = int(second)
+    if milliseconds >= 1000:
+        year, month, day, hour, minute, second = calendar_from_julian_day(
+            jd_ut1 + 0.0005 / 86400.0, gregorian=gregorian
+        )
+        whole_seconds = int(second)
+        milliseconds = int(round((second - whole_seconds) * 1000.0))
+    sign_year = f"-{abs(year):04d}" if year < 0 else f"{year:04d}"
+    return (
+        f"{sign_year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:"
+        f"{whole_seconds:02d}.{milliseconds:03d} UT1"
+    )

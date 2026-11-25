@@ -4,6 +4,7 @@ from ._version import __version__
 
 from .cities import CityCatalog
 from .engine import EclipseEngine
+from .lunar_eclipse import LunarEclipseContacts, LunarEclipseResult, LunarShadowGeometry, lunar_shadow_geometry
 from .contacts import RootResult, bisect_root, brent_root, solve_root
 from .earth_orientation import EarthOrientationConfig, describe_earth_orientation_source
 from .ephemeris import default_ephemeris_cache_dir
@@ -32,7 +33,7 @@ from .models import (
     SolarEclipseLocationHit,
     SolarEclipseSearchEvent, SolarEclipseSearchResult,
 )
-from .timeutils import delta_t_seconds, time_to_utc_iso
+from .timeutils import delta_t_seconds, time_to_utc_iso, time_to_ut1_iso
 from .exports import (
     city_hits_to_geojson, shadow_path_to_geojson, shadow_corridor_to_geojson,
     shadow_corridor_to_kml, write_city_hits_csv, write_geojson,
@@ -98,6 +99,8 @@ from .shadow_corridor_validation import (
 
 __all__ = [
     "EclipseEngine", "EclipseConfig", "EphemerisConfig", "ContactModelConfig",
+    "LunarEclipseContacts", "LunarEclipseResult", "LunarShadowGeometry",
+    "lunar_shadow_geometry",
     "HorizonProfile", "ObservationGeometry", "ShadowFootprint",
     "SolarEclipseLocationHit", "SolarEclipseSearchEvent", "SolarEclipseSearchResult",
     "SolverConfig", "AtmosphereConfig", "BesselianConfig", "EarthOrientationConfig", "describe_earth_orientation_source", "default_ephemeris_cache_dir", "Observer", "CityCatalog", "City", "ContactTimes", "ContactEvent", "LunarLimbCorrector",
@@ -110,7 +113,7 @@ __all__ = [
     "BesselianPolynomial", "BesselianElements", "BesselianSnapshot",
     "BesselianObserverState", "BesselianContact", "BesselianLocalResult",
     "BesselianGlobalPoint", "BesselianSolver",
-    "delta_t_seconds", "time_to_utc_iso",
+    "delta_t_seconds", "time_to_utc_iso", "time_to_ut1_iso",
     "city_hits_to_geojson", "shadow_path_to_geojson", "shadow_corridor_to_geojson",
     "shadow_corridor_to_kml", "write_shadow_corridor_csv", "write_shadow_corridor_kml",
     "ObservationPlan", "ObservationSitePlan", "ObservationScoreWeights",

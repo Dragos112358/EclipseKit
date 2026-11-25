@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import re
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
@@ -28,6 +30,7 @@ from .models import (
     SolarEclipseSearchEvent, SolarEclipseSearchResult, HorizonProfile, ObservationGeometry,
 )
 from .timeutils import coerce_time, time_to_utc_iso
+from .lunar_eclipse import MEAN_MOON_RADIUS_KM, LunarEclipseResult, solve_lunar_eclipse
 
 
 def _evaluate_city_search_batch(
@@ -299,9 +302,14 @@ class EclipseEngine:
             return cls(config=config)
         return cls(kernel or "de440s", **kwargs)
 
-    def time(self, value: Any) -> Any:
-        """Interpret strings/datetimes as UTC and return a Skyfield Time."""
-        return coerce_time(self.ts, value)
+    def time(self, value: Any, *, calendar: str = "historical") -> Any:
+        """Interpret dates as absolute instants using the selected civil calendar.
+
+        Date-only inputs default to the historical Julian/Gregorian cutover.
+        Pass ``calendar="julian"`` or ``calendar="gregorian"`` for a proleptic
+        calendar. Existing datetime and Skyfield Time inputs remain absolute.
+        """
+        return coerce_time(self.ts, value, calendar=calendar)
 
     def calculate_local_besselian(
         self,
@@ -420,10 +428,19 @@ class EclipseEngine:
             self.time(when), self.time_scale_mode, provenance=provenance
         )
 
-    def time_from_calendar(self, year: int, month: int, day: int,
-                           hour: int = 0, minute: int = 0, second: float = 0.0) -> Any:
+    def time_from_calendar(
+        self, year: int, month: int, day: int, hour: int = 0, minute: int = 0,
+        second: float = 0.0, *, calendar: str = "historical",
+    ) -> Any:
+        """Create a Skyfield time from Julian, Gregorian, or historical date fields."""
         from .timeutils import time_from_calendar
-        return time_from_calendar(self.ts, year, month, day, hour, minute, second)
+        if calendar == "historical":
+            # Preserve compatibility with callers/tests that wrap the original
+            # positional helper signature; its default is the historical calendar.
+            return time_from_calendar(self.ts, year, month, day, hour, minute, second)
+        return time_from_calendar(
+            self.ts, year, month, day, hour, minute, second, calendar=calendar
+        )
 
     def _observer(self, observer: Observer) -> Any:
         return observer.to_skyfield(self.earth)
@@ -2024,42 +2041,253 @@ class EclipseEngine:
                 events.append(CountryEclipseEvent(global_max, country, city_hits))
         return events
 
-    def lunar_eclipse_city_visibility(self, when: Any, catalog: CityCatalog,
-                                      *, country: str | None = None) -> list[dict[str, Any]]:
-        """Experimental approximation of lunar-eclipse umbral visibility by city.
+    def calculate_lunar_eclipse(
+        self, when: Any, *, calendar: str = "historical",
+        search_half_window_hours: float = 18.0,
+        contact_search_half_window_hours: float = 8.0,
+        contact_step_seconds: float = 300.0,
+        contact_tolerance_seconds: float = 0.05,
+        earth_radius_km: float = WGS84_A_KM,
+        moon_radius_km: float | None = None,
+        shadow_enlargement: float = 1.0,
+        shadow_model: str = "herald_sinnott",
+        atmospheric_nel_height_km: float = 87.0,
+        flattening_coefficient: float = 0.003353,
+        boundary_samples: int = 96,
+    ) -> LunarEclipseResult | None:
+        """Calculate geocentric lunar-eclipse circumstances near a full moon.
 
-        This ports the supplied simulator's simplified umbral-magnitude model.
-        It is not a substitute for a full lunar-eclipse Besselian model.
+        The default ``shadow_model="herald_sinnott"`` applies the oblate-Earth
+        and 87 km notional eclipse-forming-layer prescription described by
+        Herald & Sinnott (2014).  It computes angle-dependent penumbral/umbral
+        boundaries and solves disk-to-boundary tangencies for P1/U1/U2/U3/U4/P4.
+        ``shadow_model="circular"`` remains available for reproducibility of
+        the earlier spherical-cone implementation.
+
+        ``calendar`` controls civil-date interpretation and output formatting;
+        TT Julian Dates remain the continuous internal time coordinate.  The
+        geocentric contacts are not local moonrise/moonset visibility times.
         """
-        center = self.time(when)
-        t = self.ts.tt_jd(center.tt)
-        at = self.earth.at(t)
-        from skyfield.framelib import itrs
-        from_sun = np.asarray(at.observe(self.sun).apparent().frame_xyz(itrs).km, dtype=float)
-        from_moon = np.asarray(at.observe(self.moon).apparent().frame_xyz(itrs).km, dtype=float)
-        d_sun, d_moon = float(np.linalg.norm(from_sun)), float(np.linalg.norm(from_moon))
-        umbra_radius = WGS84_A_KM - d_moon * (self.sun_radius_km - WGS84_A_KM) / d_sun
-        sun_app, moon_app = at.observe(self.sun).apparent(), at.observe(self.moon).apparent()
-        anti_solar_separation = 180.0 - float(sun_app.separation_from(moon_app).degrees)
-        axis_distance = d_moon * math.radians(abs(anti_solar_separation))
-        umbral_magnitude = max(0.0, (umbra_radius + 1737.4 - axis_distance) / (2.0 * 1737.4))
-        indices = catalog.indices_for_country(country)
-        moon_vector = from_moon[np.newaxis, :] - catalog.ecef[indices]
-        distances = np.linalg.norm(moon_vector, axis=1)
-        directions = moon_vector / distances[:, np.newaxis]
-        altitude = np.degrees(np.arcsin(np.clip(np.sum(directions*catalog.up[indices], axis=1), -1.0, 1.0)))
-        output = []
-        for local_idx, global_idx in enumerate(indices):
-            if altitude[local_idx] <= -0.5:
+        center = self.time(when, calendar=calendar)
+        if moon_radius_km is None:
+            # Lunar-eclipse shadow contacts use the mean lunar radius, not the
+            # solar-eclipse contact radius configured for lunar limb peaks/valleys.
+            moon_radius_km = MEAN_MOON_RADIUS_KM
+
+        def positions_at(jd_tt: float) -> tuple[np.ndarray, np.ndarray]:
+            from skyfield.framelib import itrs
+
+            at = self.earth.at(self.ts.tt_jd(float(jd_tt)))
+            sun_vector = np.asarray(
+                at.observe(self.sun).apparent().frame_xyz(itrs).km, dtype=np.float64
+            )
+            moon_vector = np.asarray(
+                at.observe(self.moon).apparent().frame_xyz(itrs).km, dtype=np.float64
+            )
+            return sun_vector, moon_vector
+
+        return solve_lunar_eclipse(
+            center, positions_at, self.ts.tt_jd,
+            calendar=calendar,
+            sun_radius_km=self.sun_radius_km,
+            earth_radius_km=earth_radius_km,
+            moon_radius_km=moon_radius_km,
+            shadow_enlargement=shadow_enlargement,
+            shadow_model=shadow_model,
+            atmospheric_nel_height_km=atmospheric_nel_height_km,
+            flattening_coefficient=flattening_coefficient,
+            search_half_window_hours=search_half_window_hours,
+            contact_search_half_window_hours=contact_search_half_window_hours,
+            contact_step_seconds=contact_step_seconds,
+            contact_tolerance_seconds=contact_tolerance_seconds,
+            boundary_samples=boundary_samples,
+        )
+
+    def _lunar_interval_boundary(self, value: Any, *, calendar: str) -> Any:
+        """Convert a lunar-search boundary, treating date-only values as midnight.
+
+        The general ``time()`` API deliberately maps a date-only value to noon,
+        which is useful as the centre of a single-day calculation window.  An
+        interval has different semantics: its date-only boundaries must be at
+        civil midnight so an event earlier than noon is not silently omitted.
+        """
+        if isinstance(value, datetime):
+            return self.time(value, calendar=calendar)
+        if isinstance(value, date):
+            return self.time_from_calendar(
+                value.year, value.month, value.day, 0, 0, 0.0, calendar=calendar
+            )
+        if isinstance(value, str):
+            match = re.fullmatch(r"([+-]?\d{1,6})-(\d{2})-(\d{2})", value.strip())
+            if match is not None:
+                year, month, day = (int(part) for part in match.groups())
+                return self.time_from_calendar(
+                    year, month, day, 0, 0, 0.0, calendar=calendar
+                )
+        return self.time(value, calendar=calendar)
+
+    def find_lunar_eclipses(
+        self, start: Any, end: Any, *, calendar: str = "historical",
+        search_half_window_hours: float = 18.0,
+        contact_search_half_window_hours: float = 8.0,
+        contact_step_seconds: float = 300.0,
+        contact_tolerance_seconds: float = 0.05,
+        earth_radius_km: float = WGS84_A_KM,
+        moon_radius_km: float | None = None,
+        shadow_enlargement: float = 1.0,
+        shadow_model: str = "herald_sinnott",
+        atmospheric_nel_height_km: float = 87.0,
+        flattening_coefficient: float = 0.003353,
+        boundary_samples: int = 96,
+    ) -> list[LunarEclipseResult]:
+        """Find geocentric lunar eclipses whose greatest phase is in ``[start, end)``.
+
+        Date-only strings and ``date`` objects are interpreted as civil-midnight
+        boundaries. The end is exclusive, so ``("2025-03-14", "2025-03-15")``
+        searches the complete civil day of 14 March. Explicit timestamps remain
+        exact instants. Skyfield full-moon phases seed the search. Each candidate is then
+        independently tested with the selected Earth-shadow model. The default
+        is Herald--Sinnott oblate-Earth geometry; choose ``shadow_model="circular"``
+        only to reproduce older spherical-cone results.
+        """
+        try:
+            from skyfield import almanac
+        except ImportError as exc:  # pragma: no cover - Skyfield is a core dependency
+            raise ImportError("Skyfield is required for lunar-eclipse searches") from exc
+
+        t0 = self._lunar_interval_boundary(start, calendar=calendar)
+        t1 = self._lunar_interval_boundary(end, calendar=calendar)
+        if float(t1.tt) <= float(t0.tt):
+            raise ValueError("end must be later than start")
+        if not math.isfinite(search_half_window_hours) or search_half_window_hours <= 0:
+            raise ValueError("search_half_window_hours must be finite and positive")
+
+        padding_days = search_half_window_hours / 24.0 + 0.5
+        phase_fn = almanac.moon_phases(self.eph)
+        phase_times, phase_values = almanac.find_discrete(
+            self.ts.tt_jd(float(t0.tt) - padding_days),
+            self.ts.tt_jd(float(t1.tt) + padding_days),
+            phase_fn,
+        )
+        events: list[LunarEclipseResult] = []
+        for phase_time, phase_value in zip(phase_times, phase_values):
+            if int(phase_value) != 2:  # Skyfield phase 2 is Full Moon.
                 continue
+            result = self.calculate_lunar_eclipse(
+                phase_time, calendar=calendar,
+                search_half_window_hours=search_half_window_hours,
+                contact_search_half_window_hours=contact_search_half_window_hours,
+                contact_step_seconds=contact_step_seconds,
+                contact_tolerance_seconds=contact_tolerance_seconds,
+                earth_radius_km=earth_radius_km,
+                moon_radius_km=moon_radius_km,
+                shadow_enlargement=shadow_enlargement,
+                shadow_model=shadow_model,
+                atmospheric_nel_height_km=atmospheric_nel_height_km,
+                flattening_coefficient=flattening_coefficient,
+                boundary_samples=boundary_samples,
+            )
+            if result is not None and float(t0.tt) <= float(result.maximum.tt) < float(t1.tt):
+                events.append(result)
+        events.sort(key=lambda item: float(item.maximum.tt))
+        return events
+
+    def find_next_lunar_eclipse(
+        self, start: Any, *, search_days: float = 550.0,
+        calendar: str = "historical", **kwargs: Any,
+    ) -> LunarEclipseResult | None:
+        """Find the next geocentric lunar eclipse after ``start``."""
+        if not math.isfinite(search_days) or search_days <= 0:
+            raise ValueError("search_days must be finite and positive")
+        start_time = self._lunar_interval_boundary(start, calendar=calendar)
+        end_time = self.ts.tt_jd(float(start_time.tt) + search_days)
+        events = self.find_lunar_eclipses(
+            start_time, end_time, calendar=calendar, **kwargs
+        )
+        return events[0] if events else None
+
+    def lunar_eclipse_city_visibility(
+        self, when: Any, catalog: CityCatalog, *, country: str | None = None,
+        calendar: str = "historical", minimum_altitude_deg: float = -0.5,
+        shadow_enlargement: float = 1.0, shadow_model: str = "herald_sinnott",
+        atmospheric_nel_height_km: float = 87.0,
+        flattening_coefficient: float = 0.003353,
+    ) -> list[dict[str, Any]]:
+        """Return cities where the Moon is above the horizon at greatest eclipse.
+
+        Eclipse classification, magnitudes and contact instants are geocentric;
+        lunar altitude is topocentric. For each returned city, ``phase_visibility``
+        reports the Moon altitude at every geocentric contact and greatest eclipse.
+        These are visibility flags at geocentric instants, not locally solved
+        contact times or moonrise/moonset events.
+        """
+        if not -90.0 <= minimum_altitude_deg <= 90.0:
+            raise ValueError("minimum_altitude_deg must be in [-90, 90]")
+        event = self.calculate_lunar_eclipse(
+            when, calendar=calendar, shadow_enlargement=shadow_enlargement,
+            shadow_model=shadow_model,
+            atmospheric_nel_height_km=atmospheric_nel_height_km,
+            flattening_coefficient=flattening_coefficient,
+        )
+        if event is None:
+            return []
+
+        from skyfield.framelib import itrs
+
+        indices = catalog.indices_for_country(country)
+        if len(indices) == 0:
+            return []
+        selected_ecef = catalog.ecef[indices]
+        selected_up = catalog.up[indices]
+        phase_altitudes: dict[str, np.ndarray] = {}
+        for phase_name, phase_time in event.contacts.as_dict().items():
+            if phase_time is None:
+                continue
+            at = self.earth.at(phase_time)
+            moon_position = np.asarray(
+                at.observe(self.moon).apparent().frame_xyz(itrs).km, dtype=np.float64
+            )
+            moon_vectors = moon_position[np.newaxis, :] - selected_ecef
+            distances = np.linalg.norm(moon_vectors, axis=1)
+            directions = moon_vectors / distances[:, np.newaxis]
+            phase_altitudes[phase_name] = np.degrees(
+                np.arcsin(
+                    np.clip(np.sum(directions * selected_up, axis=1), -1.0, 1.0)
+                )
+            )
+        maximum_altitude = phase_altitudes.get("greatest")
+        if maximum_altitude is None:
+            return []
+        event_payload = event.to_dict(calendar=calendar)
+        output: list[dict[str, Any]] = []
+        for local_index, global_index in enumerate(indices):
+            altitude_deg = float(maximum_altitude[local_index])
+            if altitude_deg <= minimum_altitude_deg:
+                continue
+            phase_visibility = {
+                name: {
+                    "moon_altitude_deg": float(values[local_index]),
+                    "visible": float(values[local_index]) > minimum_altitude_deg,
+                }
+                for name, values in phase_altitudes.items()
+            }
+            visible_phases = [
+                name for name, values in phase_visibility.items() if values["visible"]
+            ]
             output.append({
-                "city": catalog.cities[int(global_idx)],
-                "maximum": t,
-                "moon_altitude_deg": float(altitude[local_idx]),
-                "approximate_umbral_magnitude": float(umbral_magnitude),
-                "eclipse_type": "total" if umbral_magnitude >= 1.0 else ("partial" if umbral_magnitude > 0 else "penumbral_or_none"),
+                "city": catalog.cities[int(global_index)],
+                "maximum": event.maximum,
+                "moon_altitude_deg": altitude_deg,
+                "penumbral_magnitude": event.penumbral_magnitude,
+                "umbral_magnitude": event.umbral_magnitude,
+                "approximate_umbral_magnitude": event.umbral_magnitude,
+                "eclipse_type": event.eclipse_type,
+                "visible_at_maximum": True,
+                "phase_visibility": phase_visibility,
+                "visible_contact_phases": visible_phases,
+                "event": event_payload,
             })
-        output.sort(key=lambda row: row["approximate_umbral_magnitude"], reverse=True)
+        output.sort(key=lambda row: row["moon_altitude_deg"], reverse=True)
         return output
 
     def format_report(self, result: LocalEclipseResult, *, language: str = "en") -> str:

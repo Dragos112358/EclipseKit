@@ -1,13 +1,13 @@
 # EclipseKit
 
-**A modular Python engine for local and global solar-eclipse circumstances.**
+**A modular Python engine for local and global solar- and lunar-eclipse circumstances.**
 
 ## Install
 
 After the Alpha release is published on PyPI, install the core library with:
 
 ```bash
-python -m pip install eclipsekit
+python -m pip install --pre eclipsekit
 ```
 
 The core install includes the numerical engine and its required NumPy/Skyfield
@@ -16,8 +16,8 @@ lunar-limb integration; the latter installs PyTorch and does not bundle a model
 checkpoint:
 
 ```bash
-python -m pip install "eclipsekit[raster]"
-python -m pip install "eclipsekit[limb]"
+python -m pip install --pre "eclipsekit[raster]"
+python -m pip install --pre "eclipsekit[limb]"
 ```
 
 
@@ -46,6 +46,9 @@ large external datasets out of the installed package.
   local C1-C4 circumstances, geocentric closest approach, and central-line
   ground tracks without deriving those elements from the active JPL kernel.
 - Country/city searches: use a user-provided CSV and vectorized batch processing.
+- Geocentric lunar-eclipse analysis using the default Herald--Sinnott oblate-Earth
+  shadow prescription, with penumbral/umbral classification, P1/U1/U2/maximum/
+  U3/U4/P4 contacts, separate UTC/UT1/TT output, and per-phase city visibility.
 - Modular lunar-limb framework: spherical baseline, caller-supplied gridded DEM, tabulated apparent-limb profile, and optional neural checkpoint adapter.
 - Import safety: importing `eclipsekit` does not download data, open a socket,
   start a thread, or load a neural model.
@@ -84,6 +87,64 @@ For the optional lunar neural network:
 ```bash
 pip install -e ".[limb,dev]"
 ```
+
+
+## Lunar-eclipse calculations (experimental)
+
+EclipseKit includes a geocentric lunar-eclipse solver. It searches full-moon
+phases, evaluates the Moon against the angle-dependent Herald--Sinnott
+oblate-Earth shadow model (87 km notional eclipse-forming layer), classifies
+penumbral, partial, and total eclipses, and solves the P1/U1/U2/maximum/U3/U4/P4
+contacts where applicable. Local city visibility is evaluated separately from
+the geocentric contacts.
+
+```python
+from eclipsekit import EclipseEngine
+
+engine = EclipseEngine("de440s")
+event = engine.find_next_lunar_eclipse("2025-01-01")
+if event is not None:
+    print(event.eclipse_type)
+    print(event.to_dict())
+
+# Search a date interval and choose the civil calendar explicitly.
+events = engine.find_lunar_eclipses(
+    "1500-01-01", "1501-01-01", calendar="julian"
+)
+```
+
+The default `calendar="historical"` uses the Julian calendar through
+1582-10-04 and the Gregorian calendar from 1582-10-15; the skipped dates
+1582-10-05 through 1582-10-14 are rejected. `calendar="julian"` and
+`calendar="gregorian"` select proleptic calendars. Time-zone-qualified timestamps
+are absolute instants and are not reinterpreted as civil-calendar fields.
+Internal event calculations remain on TT Julian dates.
+
+`find_lunar_eclipses(start, end)` uses a half-open interval (`start` included,
+`end` excluded). Date-only boundaries begin at civil midnight, so
+`find_lunar_eclipses("2025-03-14", "2025-03-15")` searches all of 14 March.
+This interval convention is separate from `EclipseEngine.time("YYYY-MM-DD")`,
+which continues to return 12:00 for date-only single-event calculations.
+
+The default lunar shadow model is the **Herald--Sinnott oblate-Earth prescription**:
+it uses an 87 km notional eclipse-forming atmospheric layer and angle-dependent
+umbra/penumbra boundaries that account for Earth's flattening. Contact times are
+refined against the full non-circular boundaries. The older circular-cone
+approximation remains available with `shadow_model="circular"` for reproducing
+legacy Alpha results.
+
+Results remain experimental until independently validated with matching
+ephemeris, Earth-orientation and Delta-T inputs. The 87 km atmospheric layer is
+an empirical global prescription, not a resolved atmospheric-opacity model.
+The result serializer reports UTC, UT1 and TT separately. Local phase visibility
+is evaluated topocentrically at each geocentric contact; it does not replace
+geocentric contact times with moonrise/moonset.
+
+See [docs/LUNAR_ECLIPSES.md](docs/LUNAR_ECLIPSES.md) for model equations,
+calendar semantics, time-scale assumptions and examples. For a reproducible
+16-event external regression matrix (2022–2028), see
+[docs/LUNAR_REFERENCE_VALIDATION_2022_2028.md](docs/LUNAR_REFERENCE_VALIDATION_2022_2028.md)
+and run `python scripts/validate_lunar_references.py --kernel de440s`.
 
 ## Configuration API (recommended for new code)
 
@@ -424,9 +485,10 @@ For contact times corrected by your neural lunar-limb model, pass both
 `find_solar_eclipses_by_country()` (or `search_cities()`). The result then
 contains geometric contacts and a separate `limb_corrected_contacts` mapping.
 
-The function `lunar_eclipse_city_visibility()` ports the supplied simplified
-lunar umbral-visibility idea as an **experimental approximation**, not as a
-validated lunar-eclipse prediction model.
+The function `lunar_eclipse_city_visibility()` evaluates topocentric Moon
+altitude at greatest eclipse and at each geocentric P1/U1/U2/U3/U4/P4 contact.
+It reports phase visibility for the supplied city catalogue; it does not solve
+local moonrise/moonset or replace the geocentric contact instants.
 
 
 ## Validate the supplied local assets
@@ -455,6 +517,9 @@ Neither the checkpoint nor the city CSV is included in the PyPI wheel.
 - `EclipseEngine.global_shadow_corridor_for_eclipse(...)`
 - `EclipseEngine.search_cities(...)`
 - `EclipseEngine.find_solar_eclipses_by_country(...)`
+- `EclipseEngine.calculate_lunar_eclipse(...)`
+- `EclipseEngine.find_lunar_eclipses(...)`
+- `EclipseEngine.find_next_lunar_eclipse(...)`
 - `EclipseEngine.lunar_eclipse_city_visibility(...)`
 - `EclipseEngine.format_report(...)`
 - `CityCatalog.from_csv(...)`

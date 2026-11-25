@@ -37,6 +37,9 @@ from .extensions import (
     UnknownExtensionError, ExtensionError, LunarDEMReader, LunarDEMReaderFactory,
     LunarLimbModelFactory, discover_extensions, load_extension,
 )
+from .lunar_eclipse import (
+    LunarEclipseContacts, LunarEclipseResult, LunarShadowGeometry, lunar_shadow_geometry,
+)
 from .limb import (
     AngularLunarLimbProfile, GriddedLunarLimbModel, LunarLimbCorrector,
     LunarLimbModel, LunarLimbModelMetadata, LunarLimbPrediction, LunarLimbQuery,
@@ -80,7 +83,7 @@ from .shadow_corridor_validation import (
     compare_shadow_corridor_resolutions, load_corridor_reference_csv,
     validate_shadow_corridor_reference,
 )
-from .timeutils import delta_t_seconds, time_to_utc_iso
+from .timeutils import delta_t_seconds, time_to_utc_iso, time_to_ut1_iso
 from .topography import (
     LunarDEMCacheInfo, LunarDEMWindow, PDS3LunarDEMModel,
     PDS3LunarDEMProductInfo, open_pds3_lunar_dem, parse_pds3_label,
@@ -153,6 +156,8 @@ def get_runtime_info() -> RuntimeInfo:
 __all__ = [
     "API_CONTRACT_VERSION", "API_STATUS", "PACKAGE_VERSION", "RuntimeInfo", "get_runtime_info",
     "EclipseEngine", "EclipseConfig", "EphemerisConfig", "ContactModelConfig",
+    "LunarEclipseContacts", "LunarEclipseResult", "LunarShadowGeometry",
+    "lunar_shadow_geometry",
     "SolverConfig", "AtmosphereConfig", "BesselianConfig", "EarthOrientationConfig",
     "describe_earth_orientation_source", "default_ephemeris_cache_dir", "Observer", "City",
     "CityCatalog", "ContactTimes", "ContactEvent", "LimbContact", "LocalEclipseResult",
@@ -162,7 +167,7 @@ __all__ = [
     "ShadowCorridorSample", "ShadowCorridorResult", "RootResult", "bisect_root",
     "brent_root", "solve_root", "BesselianPolynomial", "BesselianElements",
     "BesselianSnapshot", "BesselianObserverState", "BesselianContact", "BesselianLocalResult",
-    "BesselianGlobalPoint", "BesselianSolver", "delta_t_seconds", "time_to_utc_iso",
+    "BesselianGlobalPoint", "BesselianSolver", "delta_t_seconds", "time_to_utc_iso", "time_to_ut1_iso",
     "city_hits_to_geojson", "shadow_path_to_geojson", "shadow_corridor_to_geojson",
     "shadow_corridor_to_kml", "write_shadow_corridor_csv", "write_shadow_corridor_kml",
     "shadow_footprint_to_geojson", "write_shadow_footprint_geojson", "write_city_hits_csv",
