@@ -11,28 +11,23 @@ on:
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: github-pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
 
     steps:
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@v5
 
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -46,10 +41,49 @@ jobs:
         run: zensical build --clean
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@v4
         with:
           path: site
+          name: github-pages
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Wait until the Pages artifact is visible
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for attempt in {1..18}; do
+            artifact_count="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq '[.artifacts[] | select(.name == "github-pages" and .expired == false)] | length')"
+
+            if [ "$artifact_count" -eq 1 ]; then
+              echo "Pages artifact is visible."
+              exit 0
+            fi
+
+            if [ "$artifact_count" -gt 1 ]; then
+              echo "Expected one github-pages artifact, found $artifact_count."
+              exit 1
+            fi
+
+            echo "Pages artifact is not visible yet (attempt $attempt/18). Waiting 5 seconds..."
+            sleep 5
+          done
+
+          echo "The github-pages artifact did not become visible within 90 seconds."
+          exit 1
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
