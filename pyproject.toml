@@ -5,13 +5,27 @@ build-backend = "hatchling.build"
 [project]
 name = "eclipsekit"
 version = "0.1.0a1"
-description = "A modular Python engine for solar- and lunar-eclipse circumstances"
+description = "Python library for solar and lunar eclipse calculations, local contact times, obscuration, JPL ephemerides and WGS84 solar-eclipse paths."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE.md"]
 requires-python = ">=3.10"
 authors = [{ name = "Boncan Dragos-Eduard-Gabriel" }]
-keywords = ["astronomy", "solar-eclipse", "lunar-eclipse", "ephemeris", "eclipse-prediction"]
+keywords = [
+    "python",
+    "astronomy",
+    "solar-eclipse",
+    "lunar-eclipse",
+    "eclipse-calculation",
+    "eclipse-prediction",
+    "eclipse-contacts",
+    "solar-eclipse-path",
+    "lunar-eclipse-visibility",
+    "besselian-elements",
+    "jpl-ephemeris",
+    "skyfield",
+    "wgs84"
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
