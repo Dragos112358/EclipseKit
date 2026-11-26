@@ -1,0 +1,6 @@
+# Public documentation is intended to be discoverable by search and AI crawlers.
+# This broad Allow rule also permits crawlers used for model training.
+User-agent: *
+Allow: /
+
+Sitemap: https://dragos112358.github.io/EclipseKit/sitemap.xml

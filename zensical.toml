@@ -1,0 +1,80 @@
+[project]
+site_name = "EclipseKit"
+site_url = "https://dragos112358.github.io/EclipseKit/"
+site_description = "Python toolkit for solar and lunar eclipse calculations, local contact times, JPL ephemerides, Besselian methods and global WGS84 shadow paths."
+site_author = "Dragos Boncan"
+repo_url = "https://github.com/Dragos112358/EclipseKit"
+edit_uri = "edit/main/docs/"
+docs_dir = "docs"
+site_dir = "site"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Installation and quick start" = "getting-started.md" },
+  ]},
+  { "Solar eclipses" = [
+    { "Local solar eclipse calculator" = "solar-eclipse-calculator.md" },
+    { "C1–C4 contact times" = "solar-eclipse-contacts.md" },
+    { "Global shadow paths" = "global-shadow-paths.md" },
+    { "Contact event model" = "CONTACT_EVENT_MODEL.md" },
+    { "Contact solver" = "CONTACT_SOLVER_V2.md" },
+    { "Shadow corridor model" = "SHADOW_CORRIDOR_V2.md" },
+    { "Observation planner" = "OBSERVATION_PLANNER.md" },
+  ]},
+  { "Lunar eclipses" = [
+    { "Lunar eclipse calculator" = "lunar-eclipse-calculator.md" },
+    { "Lunar eclipse calculations" = "LUNAR_ECLIPSES.md" },
+    { "Lunar eclipse methodology" = "LUNAR_ECLIPSE_METHODOLOGY.md" },
+    { "Lunar limb framework" = "LUNAR_LIMB_FRAMEWORK.md" },
+    { "Lunar topography and PDS3" = "LUNAR_TOPOGRAPHY_PDS3.md" },
+    { "Lunar reference validation" = "LUNAR_REFERENCE_VALIDATION_2022_2028.md" },
+  ]},
+  { "Numerical methods" = [
+    { "JPL ephemerides" = "jpl-ephemerides.md" },
+    { "Besselian calculations" = "besselian-calculations.md" },
+    { "Besselian backend details" = "BESSELIAN_BACKEND.md" },
+    { "Earth orientation and time scales" = "EARTH_ORIENTATION.md" },
+    { "Uncertainty propagation" = "UNCERTAINTY_PROPAGATION.md" },
+    { "Data provenance" = "DATA_PROVENANCE.md" },
+  ]},
+  { "API and extensions" = [
+    { "Public API reference" = "PUBLIC_API.md" },
+    { "Configuration API" = "CONFIGURATION_API.md" },
+    { "API migration" = "API_MIGRATION.md" },
+    { "Extensions" = "EXTENSIONS.md" },
+  ]},
+  { "Validation" = [
+    { "Validation and accuracy overview" = "validation-and-accuracy.md" },
+    { "Scientific validation" = "SCIENTIFIC_VALIDATION.md" },
+    { "Validation framework" = "VALIDATION_FRAMEWORK.md" },
+    { "Performance and regression" = "PERFORMANCE_AND_REGRESSION.md" },
+  ]},
+]
+
+exclude_docs = """
+/GITHUB_PUBLISH.md
+/IMPLEMENTATION_ROADMAP.md
+/PHASE*.md
+/TEST_COVERAGE_7_1.md
+/LUNAR_REFERENCE_VALIDATION_2022_2025.md
+"""
+
+[project.theme]
+language = "en"
+features = [
+  "navigation.tabs",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.suggest",
+  "search.highlight",
+  "content.code.copy",
+  "content.action.edit",
+  "content.action.view",
+]
+
+[project.theme.palette]
+scheme = "slate"
+primary = "blue"
+accent = "cyan"
